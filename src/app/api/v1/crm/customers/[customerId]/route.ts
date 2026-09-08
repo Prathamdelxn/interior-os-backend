@@ -37,10 +37,19 @@ const updateCustomerSchema = z.object({
   leadSource: z.string().optional(),
   propertyType: z.string().optional(),
   projectLocation: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  pincode: z.string().optional(),
+  propertyAddress: z.string().optional(),
   budgetRange: z.string().optional(),
   status: z.string().optional(),
   assignedSalesExecutive: z.string().optional(),
   designerAssigned: z.string().optional(),
+  priority: z.string().optional(),
+  possessionDate: z.coerce.date().optional().nullable(),
+  siteVisitScheduledDate: z.coerce.date().optional().nullable(),
+  futureFollowUpDate: z.coerce.date().optional().nullable(),
   siteMeasurements: z.any().optional(),
   sitePhotos: z.array(z.string()).optional(),
   requirements: z.any().optional(),
@@ -78,12 +87,15 @@ async function updateCustomerHandler(
       return errorResponse('Customer not found', 404);
     }
 
-    if (existing.status === 'Won' || existing.status === 'Converted' || existing.linkedProject) {
-      return errorResponse('This lead has already been converted to an active project and is locked from modification.', 400);
-    }
-
     const updateData: any = { ...validation.data };
     const unsetData: any = {};
+
+    // If lead has already been converted or won, preserve its status and project link, but permit updating site measurements, photos, requirements, remarks, etc.
+    if (existing.status === 'Won' || existing.status === 'Converted' || existing.linkedProject) {
+      if (updateData.status && updateData.status !== existing.status) {
+        delete updateData.status;
+      }
+    }
 
     if (updateData.assignedSalesExecutive === '' || updateData.assignedSalesExecutive === null) {
       delete updateData.assignedSalesExecutive;

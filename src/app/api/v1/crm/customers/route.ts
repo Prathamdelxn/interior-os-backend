@@ -61,6 +61,8 @@ const createCustomerSchema = z.object({
   priority: z.enum(['Low', 'Medium', 'High']).optional(),
   budgetRange: z.string().optional(),
   possessionDate: z.coerce.date().optional(),
+  siteVisitScheduledDate: z.coerce.date().optional(),
+  futureFollowUpDate: z.coerce.date().optional(),
   remarks: z.string().optional(),
 });
 

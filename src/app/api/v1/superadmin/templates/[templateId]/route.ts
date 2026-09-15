@@ -91,7 +91,7 @@ export const DELETE = withSuperAdmin(
       const template = await ProjectTemplate.findByIdAndUpdate(
         templateId,
         { $set: { isDeleted: true, deletedAt: new Date() } },
-        { new: true }
+        { returnDocument: 'after' }
       );
 
       if (!template) {

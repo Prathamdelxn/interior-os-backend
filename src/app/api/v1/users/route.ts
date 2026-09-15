@@ -110,13 +110,19 @@ async function createUserHandler(req: NextRequest, _context: any, auth: JwtPaylo
       return errorResponse('User already exists with this email', 400);
     }
 
-    if (role && !mongoose.Types.ObjectId.isValid(role)) {
-      return errorResponse('Invalid role ID', 400);
-    }
+    let resolvedRoleId: mongoose.Types.ObjectId | undefined = undefined;
     if (role) {
-      const roleDoc = await Role.findOne({ _id: role, organizationId });
-      if (!roleDoc) {
-        return errorResponse('Role not found in this organization', 400);
+      if (mongoose.Types.ObjectId.isValid(role)) {
+        const roleDoc = await Role.findOne({ _id: role, organizationId });
+        if (roleDoc) {
+          resolvedRoleId = roleDoc._id as mongoose.Types.ObjectId;
+        }
+      }
+      if (!resolvedRoleId) {
+        const roleDoc = await Role.findOne({ slug: role, organizationId });
+        if (roleDoc) {
+          resolvedRoleId = roleDoc._id as mongoose.Types.ObjectId;
+        }
       }
     }
 
@@ -128,7 +134,7 @@ async function createUserHandler(req: NextRequest, _context: any, auth: JwtPaylo
       phone,
       designation,
       department,
-      role: role || undefined,
+      role: resolvedRoleId || undefined,
       systemRole: systemRole || 'member',
       status: 'active',
       organizationId,

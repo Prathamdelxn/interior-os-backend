@@ -141,7 +141,7 @@ async function deleteDrawingHandler(req: NextRequest, context: { params: Promise
     const drawing = await Drawing.findOneAndUpdate(
       { _id: drawingId, projectId, organizationId },
       { isDeleted: true, deletedAt: new Date() },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!drawing) {

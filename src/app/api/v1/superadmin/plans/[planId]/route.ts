@@ -70,7 +70,7 @@ export const PUT = withSuperAdmin(
           ...(body.isActive !== undefined && { isActive: body.isActive }),
           ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
         },
-        { new: true, runValidators: true }
+        { returnDocument: 'after', runValidators: true }
       ).lean();
 
       if (!plan) {
@@ -100,7 +100,7 @@ export const DELETE = withSuperAdmin(
       const plan = await SubscriptionPlan.findByIdAndUpdate(
         planId,
         { isActive: false },
-        { new: true }
+        { returnDocument: 'after' }
       ).lean();
 
       if (!plan) {

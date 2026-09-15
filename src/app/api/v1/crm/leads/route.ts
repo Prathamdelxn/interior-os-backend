@@ -10,6 +10,7 @@ import { User } from '@/models/user.model';
 import { successResponse, createdResponse, serverErrorResponse, paginatedResponse, parsePaginationParams, buildPaginationMeta, errorResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import { z } from 'zod';
+import { logAuditEvent } from '@/services/audit.service';
 
 const createLeadSchema = z.object({
   leadName: z
@@ -120,6 +121,30 @@ async function createLeadHandler(req: NextRequest, _context: any, auth: JwtPaylo
     });
 
     await lead.save();
+
+    // Capture audit log
+    await logAuditEvent({
+      organizationId,
+      userId: auth.userId,
+      action: 'create',
+      entity: 'CRM',
+      entityId: lead._id.toString(),
+      entityName: lead.leadName,
+      description: `Created new CRM lead "${lead.leadName}" with budget ₹${lead.budget.toLocaleString()}`,
+      changes: {
+        after: {
+          leadName: lead.leadName,
+          phone: lead.phone,
+          email: lead.email,
+          projectType: lead.projectType,
+          budget: lead.budget,
+          source: lead.source,
+          stage: lead.stage,
+        },
+      },
+      req,
+    });
+
     return createdResponse(lead, 'CRM Lead created successfully');
   } catch (error: any) {
     console.error('Create CRM lead error:', error);

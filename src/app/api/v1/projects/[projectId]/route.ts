@@ -102,7 +102,7 @@ async function updateProjectHandler(req: NextRequest, context: { params: Promise
     const project = await Project.findOneAndUpdate(
       { _id: projectId, organizationId, isDeleted: false },
       { $set: validation.data },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!project) {
@@ -126,7 +126,7 @@ async function deleteProjectHandler(req: NextRequest, context: { params: Promise
     const project = await Project.findOneAndUpdate(
       { _id: projectId, organizationId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!project) {

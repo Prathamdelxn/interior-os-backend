@@ -162,6 +162,30 @@ async function createCustomerHandler(req: NextRequest, _context: any, auth: JwtP
       return errorResponse('Failed to generate a unique lead number. Please try again.', 500);
     }
 
+    try {
+      const { logAuditEvent } = await import('@/services/audit.service');
+      logAuditEvent({
+        organizationId,
+        userId: auth.userId,
+        action: 'create',
+        entity: 'CRM',
+        entityId: customer._id,
+        entityName: customer.name,
+        description: `Created new CRM customer lead "${customer.name}" (Lead: ${customer.leadNumber || 'LD'}, Phone: ${customer.mobileNumber})`,
+        changes: {
+          after: {
+            name: customer.name,
+            mobileNumber: customer.mobileNumber,
+            leadSource: customer.leadSource,
+            status: customer.status,
+            propertyType: customer.propertyType,
+            budgetRange: customer.budgetRange,
+          },
+        },
+        req,
+      }).catch(() => {});
+    } catch {}
+
     return createdResponse(customer, 'Customer lead created successfully');
   } catch (error: any) {
     console.error('Create CRM customer error:', error);

@@ -26,7 +26,7 @@ async function deletePaymentHandler(
     const payment = await Payment.findOneAndUpdate(
       { _id: paymentId, projectId, organizationId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!payment) {

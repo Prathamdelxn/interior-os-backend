@@ -21,10 +21,67 @@ function slugify(text: string): string {
 export async function signup(input: SignupInput) {
   await connectDB();
 
+  const normalizedEmail = input.email.toLowerCase().trim();
+
   // Check if user already exists
-  const existingUser = await User.findOne({ email: input.email });
+  const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
-    throw new AppError('An account with this email already exists', 409);
+    // If the account is still pending verification, update info and resend verification OTP
+    if (!existingUser.isEmailVerified || existingUser.status === 'pending') {
+      const emailVerificationOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      existingUser.firstName = input.firstName;
+      existingUser.lastName = input.lastName;
+      existingUser.password = input.password;
+      if (input.phone) existingUser.phone = input.phone;
+      existingUser.emailVerificationToken = emailVerificationOtp;
+      existingUser.emailVerificationExpiry = new Date(Date.now() + 15 * 60 * 1000);
+      await existingUser.save();
+
+      // Ensure all default roles exist for this organization
+      const roleKeys = [
+        'admin',
+        'project_manager',
+        'sales_executive',
+        'designer',
+        'quantity_surveyor',
+        'site_engineer',
+        'sub_contractor',
+        'client_representative',
+        'viewer',
+      ] as const;
+
+      for (const key of roleKeys) {
+        await Role.findOneAndUpdate(
+          { organizationId: existingUser.organizationId, slug: DEFAULT_ROLES[key].slug },
+          {
+            $setOnInsert: {
+              organizationId: existingUser.organizationId,
+              name: DEFAULT_ROLES[key].name,
+              slug: DEFAULT_ROLES[key].slug,
+              description: DEFAULT_ROLES[key].description,
+              permissions: DEFAULT_ROLES[key].permissions,
+              isSystem: true,
+              isActive: true,
+              isDeleted: false,
+            },
+          },
+          { upsert: true, returnDocument: 'after' }
+        );
+      }
+
+      await sendEmail({
+        to: existingUser.email,
+        subject: 'Verify your SkyStruct-lite Interior account',
+        html: otpEmailTemplate(existingUser.firstName, emailVerificationOtp),
+      });
+
+      return {
+        email: existingUser.email,
+        message: 'OTP resent successfully. Please check your email.',
+      };
+    }
+
+    throw new AppError('An account with this email already exists. Please log in instead.', 409);
   }
 
   // Create organization
@@ -40,19 +97,28 @@ export async function signup(input: SignupInput) {
     },
   });
 
-  // Create default roles for the organization
-  const adminRoleData = {
-    ...DEFAULT_ROLES.admin,
-    organizationId: organization._id,
-  };
-  const adminRole = await Role.create(adminRoleData);
+  // Create all default roles for the organization
+  const roleKeys = [
+    'admin',
+    'project_manager',
+    'sales_executive',
+    'designer',
+    'quantity_surveyor',
+    'site_engineer',
+    'sub_contractor',
+    'client_representative',
+    'viewer',
+  ] as const;
 
-  // Create remaining system roles
-  for (const key of ['project_manager', 'sales_executive', 'designer', 'quantity_surveyor', 'site_engineer', 'viewer'] as const) {
-    await Role.create({
+  let adminRole: any = null;
+  for (const key of roleKeys) {
+    const roleDoc = await Role.create({
       ...DEFAULT_ROLES[key],
       organizationId: organization._id,
     });
+    if (key === 'admin') {
+      adminRole = roleDoc;
+    }
   }
 
   // Generate 6-digit email verification OTP
@@ -61,7 +127,7 @@ export async function signup(input: SignupInput) {
   // Create admin user
   const user = await User.create({
     organizationId: organization._id,
-    email: input.email,
+    email: normalizedEmail,
     password: input.password,
     firstName: input.firstName,
     lastName: input.lastName,
@@ -133,6 +199,21 @@ export async function login(input: LoginInput, deviceInfo?: { userAgent?: string
   user.lastLoginAt = new Date();
   user.status = user.status === 'pending' ? 'active' : user.status;
   await user.save();
+
+  // Audit log login event
+  try {
+    const { logAuditEvent } = await import('@/services/audit.service');
+    logAuditEvent({
+      organizationId: user.organizationId,
+      userId: user._id,
+      action: 'login',
+      entity: 'Authentication',
+      entityId: user._id,
+      entityName: `${user.firstName} ${user.lastName}`,
+      description: `User ${user.firstName} ${user.lastName} (${user.email}) logged in successfully`,
+      metadata: deviceInfo,
+    }).catch(() => {});
+  } catch {}
 
   // Get organization
   const organization = await Organization.findById(user.organizationId);

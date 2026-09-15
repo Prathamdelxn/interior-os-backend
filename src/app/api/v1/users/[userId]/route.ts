@@ -90,15 +90,19 @@ async function updateUserHandler(req: NextRequest, context: { params: Promise<Re
     }
 
     if (role !== undefined) {
-      if (role && !mongoose.Types.ObjectId.isValid(role)) {
-        return errorResponse('Invalid role ID', 400);
-      }
       if (role) {
-        const roleDoc = await Role.findOne({ _id: role, organizationId });
-        if (!roleDoc) {
-          return errorResponse('Role not found in this organization', 400);
+        let roleDoc: any = null;
+        if (mongoose.Types.ObjectId.isValid(role)) {
+          roleDoc = await Role.findOne({ _id: role, organizationId });
         }
-        user.role = new mongoose.Types.ObjectId(role);
+        if (!roleDoc) {
+          roleDoc = await Role.findOne({ slug: role, organizationId });
+        }
+        if (roleDoc) {
+          user.role = roleDoc._id;
+        } else {
+          user.role = undefined as any;
+        }
       } else {
         user.role = undefined as any;
       }

@@ -110,7 +110,7 @@ async function updateMilestoneHandler(req: NextRequest, context: { params: Promi
     const milestone = await Milestone.findOneAndUpdate(
       { _id: milestoneId, projectId, organizationId, isDeleted: false },
       { $set: updateData },
-      { new: true }
+      { returnDocument: 'after' }
     ).populate('linkedTasks', 'name status progress');
 
     if (!milestone) {
@@ -172,7 +172,7 @@ async function deleteMilestoneHandler(req: NextRequest, context: { params: Promi
     const milestone = await Milestone.findOneAndUpdate(
       { _id: milestoneId, projectId, organizationId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!milestone) {

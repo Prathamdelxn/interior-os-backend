@@ -76,7 +76,7 @@ async function updatePurchaseOrderHandler(req: NextRequest, context: { params: P
     const updatedPo = await PurchaseOrder.findOneAndUpdate(
       { _id: purchaseOrderId, projectId, organizationId, isDeleted: false },
       { $set: body },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     // Sync items with inventory if the status changed into/out of 'delivered'
@@ -125,7 +125,7 @@ async function deletePurchaseOrderHandler(req: NextRequest, context: { params: P
     const po = await PurchaseOrder.findOneAndUpdate(
       { _id: purchaseOrderId, projectId, organizationId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!po) {

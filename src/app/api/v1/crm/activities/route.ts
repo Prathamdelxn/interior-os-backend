@@ -118,6 +118,26 @@ async function createActivityHandler(req: NextRequest, _context: any, auth: JwtP
     if (activity && typeof activity.populate === 'function') {
       await activity.populate('user', 'firstName lastName email');
     }
+
+    try {
+      const { logAuditEvent } = await import('@/services/audit.service');
+      logAuditEvent({
+        organizationId,
+        userId: auth.userId,
+        action: 'create',
+        entity: 'CRM',
+        entityId: activity._id,
+        entityName: `${validData.type} Follow-up`,
+        description: `Logged CRM activity "${validData.type}" for customer (${validData.remarks})`,
+        metadata: {
+          type: validData.type,
+          status: validData.status,
+          customerId: validData.customer,
+        },
+        req,
+      }).catch(() => {});
+    } catch {}
+
     return createdResponse(activity, 'Activity created successfully');
   } catch (error: any) {
     console.error('Create CRM activity error:', error);

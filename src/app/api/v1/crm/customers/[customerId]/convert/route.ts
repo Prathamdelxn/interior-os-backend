@@ -304,6 +304,26 @@ async function convertCustomerHandler(
 
     await customer.save();
 
+    try {
+      const { logAuditEvent } = await import('@/services/audit.service');
+      logAuditEvent({
+        organizationId,
+        userId: auth.userId,
+        action: 'approve',
+        entity: 'CRM',
+        entityId: customer._id,
+        entityName: customer.name,
+        description: `Converted CRM Lead "${customer.name}" (${customer.leadNumber}) to Active Project "${project.name}" (Code: ${project.code}, Budget: ₹${totalBudget.toLocaleString('en-IN')})`,
+        metadata: {
+          projectId: project._id,
+          projectCode: project.code,
+          budget: totalBudget,
+          leadNumber: customer.leadNumber,
+        },
+        req,
+      }).catch(() => {});
+    } catch {}
+
     return successResponse(
       { project, customer },
       'Lead converted to Project successfully'

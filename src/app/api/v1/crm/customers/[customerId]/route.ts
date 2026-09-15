@@ -114,7 +114,7 @@ async function updateCustomerHandler(
     const customer = await CrmCustomer.findOneAndUpdate(
       { _id: customerId, organizationId },
       updateQuery,
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!customer) {
@@ -133,6 +133,45 @@ async function updateCustomerHandler(
         completedDate: new Date(),
       });
     }
+
+    try {
+      const { logAuditEvent } = await import('@/services/audit.service');
+      let desc = `Updated CRM customer "${customer.name}"`;
+      if (data.status && data.status !== existing.status) {
+        desc = `Moved CRM lead "${customer.name}" (${customer.leadNumber || 'LD'}) from "${existing.status}" to "${data.status}"`;
+      } else if (data.quotations && data.quotations.length > (existing.quotations?.length || 0)) {
+        desc = `Saved new quotation version for CRM lead "${customer.name}"`;
+      } else if (data.boqs && data.boqs.length > (existing.boqs?.length || 0)) {
+        desc = `Created/updated BOQ specification for CRM lead "${customer.name}"`;
+      } else if (data.siteMeasurements) {
+        desc = `Updated site survey measurements for CRM lead "${customer.name}"`;
+      }
+
+      logAuditEvent({
+        organizationId,
+        userId: auth.userId,
+        action: 'update',
+        entity: 'CRM',
+        entityId: customer._id,
+        entityName: customer.name,
+        description: desc,
+        changes: {
+          before: {
+            status: existing.status,
+            assignedSalesExecutive: existing.assignedSalesExecutive,
+            designerAssigned: existing.designerAssigned,
+            budgetRange: existing.budgetRange,
+          },
+          after: {
+            status: customer.status,
+            assignedSalesExecutive: customer.assignedSalesExecutive,
+            designerAssigned: customer.designerAssigned,
+            budgetRange: customer.budgetRange,
+          },
+        },
+        req,
+      }).catch(() => {});
+    } catch {}
 
     return successResponse(customer, 'Customer updated successfully');
   } catch (error: any) {
@@ -181,6 +220,28 @@ async function deleteCustomerHandler(
 
     // Delete related activities
     await CrmActivity.deleteMany({ customer: customerId, organizationId });
+
+    try {
+      const { logAuditEvent } = await import('@/services/audit.service');
+      logAuditEvent({
+        organizationId,
+        userId: auth.userId,
+        action: 'delete',
+        entity: 'CRM',
+        entityId: customer._id,
+        entityName: customer.name,
+        description: `Permanently deleted CRM customer lead "${customer.name}" (${customer.leadNumber || 'LD'})`,
+        changes: {
+          before: {
+            name: customer.name,
+            leadNumber: customer.leadNumber,
+            mobileNumber: customer.mobileNumber,
+            status: customer.status,
+          },
+        },
+        req,
+      }).catch(() => {});
+    } catch {}
 
     return successResponse(null, 'Customer lead deleted successfully');
   } catch (error: any) {

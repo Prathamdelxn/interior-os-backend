@@ -101,7 +101,7 @@ async function deleteMemberHandler(req: NextRequest, context: { params: Promise<
     const member = await ProjectMember.findOneAndUpdate(
       { _id: memberId, projectId, organizationId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!member) {

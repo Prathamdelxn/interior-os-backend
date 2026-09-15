@@ -377,6 +377,28 @@ async function createProjectHandler(req: NextRequest, _context: any, auth: JwtPa
       }
     }
 
+    try {
+      const { logAuditEvent } = await import('@/services/audit.service');
+      logAuditEvent({
+        organizationId,
+        userId: auth.userId,
+        action: 'create',
+        entity: 'Project',
+        entityId: project._id,
+        entityName: project.name,
+        description: `Created new project "${project.name}" (Code: ${project.code})`,
+        changes: {
+          after: {
+            name: project.name,
+            client: project.client,
+            status: project.status,
+            budget: project.budget?.amount || 0,
+          },
+        },
+        req,
+      }).catch(() => {});
+    } catch {}
+
     return createdResponse(project, 'Project created successfully');
   } catch (error: any) {
     console.error('Create project error:', error);

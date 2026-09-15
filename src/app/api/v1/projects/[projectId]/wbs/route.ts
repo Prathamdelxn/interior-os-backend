@@ -261,15 +261,15 @@ async function updateWbsNodeHandler(req: NextRequest, context: { params: Promise
     const query = { _id: id, projectId, organizationId };
 
     if (type === 'building') {
-      updatedNode = await Building.findOneAndUpdate(query, { $set: updateData }, { new: true });
+      updatedNode = await Building.findOneAndUpdate(query, { $set: updateData }, { returnDocument: 'after' });
     } else if (type === 'floor') {
-      updatedNode = await Floor.findOneAndUpdate(query, { $set: updateData }, { new: true });
+      updatedNode = await Floor.findOneAndUpdate(query, { $set: updateData }, { returnDocument: 'after' });
     } else if (type === 'zone') {
-      updatedNode = await Zone.findOneAndUpdate(query, { $set: updateData }, { new: true });
+      updatedNode = await Zone.findOneAndUpdate(query, { $set: updateData }, { returnDocument: 'after' });
     } else if (type === 'area') {
-      updatedNode = await Area.findOneAndUpdate(query, { $set: updateData }, { new: true });
+      updatedNode = await Area.findOneAndUpdate(query, { $set: updateData }, { returnDocument: 'after' });
     } else if (type === 'package') {
-      updatedNode = await Package.findOneAndUpdate(query, { $set: updateData }, { new: true });
+      updatedNode = await Package.findOneAndUpdate(query, { $set: updateData }, { returnDocument: 'after' });
     }
 
     if (!updatedNode) {

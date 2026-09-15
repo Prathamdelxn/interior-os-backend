@@ -215,21 +215,12 @@ async function getGlobalDashboardHandler(req: NextRequest, _context: any, auth: 
         });
       }
     } else {
-      const curves = [
-        { planned: 12, actual: 10 },
-        { planned: 24, actual: 20 },
-        { planned: 38, actual: 32 },
-        { planned: 52, actual: 45 },
-        { planned: 68, actual: 60 },
-        { planned: 80, actual: 75 },
-      ];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const curve = curves[5 - i];
         progressTrendData.push({
           month: months[d.getMonth()],
-          planned: curve.planned,
-          actual: curve.actual,
+          planned: 0,
+          actual: 0,
         });
       }
     }

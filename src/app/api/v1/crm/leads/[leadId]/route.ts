@@ -1,7 +1,3 @@
-// =============================================================================
-// InteriorOS Backend — CRM Lead Detail API: GET, PUT, DELETE
-// =============================================================================
-
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
@@ -9,6 +5,7 @@ import { CRMLead } from '@/models/crm-lead.model';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import mongoose from 'mongoose';
+import { logAuditEvent } from '@/services/audit.service';
 
 // GET: Fetch lead details
 async function getLeadDetailsHandler(req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) {
@@ -104,6 +101,16 @@ async function updateLeadHandler(req: NextRequest, context: { params: Promise<Re
       return errorResponse('Lead not found or unauthorized', 404);
     }
 
+    const beforeState = {
+      leadName: lead.leadName,
+      phone: lead.phone,
+      email: lead.email,
+      stage: lead.stage,
+      budget: lead.budget,
+      urgency: lead.urgency,
+      location: lead.location,
+    };
+
     // Update fields dynamically
     const fieldsToUpdate = [
       'leadName',
@@ -151,6 +158,31 @@ async function updateLeadHandler(req: NextRequest, context: { params: Promise<Re
     }
 
     await lead.save();
+
+    // Capture audit log
+    await logAuditEvent({
+      organizationId,
+      userId: auth.userId,
+      action: 'update',
+      entity: 'CRM',
+      entityId: lead._id.toString(),
+      entityName: lead.leadName,
+      description: `Updated CRM lead details for "${lead.leadName}" (Stage: ${lead.stage})`,
+      changes: {
+        before: beforeState,
+        after: {
+          leadName: lead.leadName,
+          phone: lead.phone,
+          email: lead.email,
+          stage: lead.stage,
+          budget: lead.budget,
+          urgency: lead.urgency,
+          location: lead.location,
+        },
+      },
+      req,
+    });
+
     return successResponse(lead, 'Lead details updated successfully');
   } catch (error: any) {
     console.error('Update CRM lead error:', error);
@@ -172,12 +204,24 @@ async function deleteLeadHandler(req: NextRequest, context: { params: Promise<Re
     const lead = await CRMLead.findOneAndUpdate(
       { _id: leadId, organizationId, isDeleted: false },
       { isDeleted: true, deletedAt: new Date() },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!lead) {
       return errorResponse('Lead not found or unauthorized', 404);
     }
+
+    // Capture audit log
+    await logAuditEvent({
+      organizationId,
+      userId: auth.userId,
+      action: 'delete',
+      entity: 'CRM',
+      entityId: lead._id.toString(),
+      entityName: lead.leadName,
+      description: `Deleted CRM lead "${lead.leadName}"`,
+      req,
+    });
 
     return successResponse(null, 'Lead deleted successfully');
   } catch (error) {

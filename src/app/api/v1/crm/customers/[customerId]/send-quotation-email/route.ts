@@ -91,6 +91,26 @@ async function sendQuotationEmailHandler(
       completedDate: new Date(),
     });
 
+    try {
+      const { logAuditEvent } = await import('@/services/audit.service');
+      logAuditEvent({
+        organizationId,
+        userId: auth.userId,
+        action: 'export',
+        entity: 'Quotation',
+        entityId: customer._id,
+        entityName: `${customer.name} - ${qtnLabel}`,
+        description: `Emailed official Proforma Invoice & Quotation (${qtnLabel}) to recipient ${targetEmail} (Total: ₹${(Number(quotation.grandTotal) || 0).toLocaleString('en-IN')})`,
+        metadata: {
+          quotationNumber: qtnLabel,
+          amount: quotation.grandTotal,
+          recipientEmail: targetEmail,
+          customerName: customer.name,
+        },
+        req,
+      }).catch(() => {});
+    } catch {}
+
     return successResponse(
       { emailedTo: targetEmail },
       `Proforma Invoice & Quotation sent successfully to ${targetEmail}`

@@ -250,6 +250,31 @@ export const DEFAULT_ROLES = {
     ],
     isSystem: true,
   },
+  sub_contractor: {
+    name: 'Sub Contractor',
+    slug: 'sub-contractor',
+    description: 'Assigned execution tasks & limited drawing view',
+    permissions: [
+      { module: 'dashboard' as ModuleName, actions: ['read' as PermissionAction] },
+      { module: 'projects' as ModuleName, actions: ['read' as PermissionAction] },
+      { module: 'tasks' as ModuleName, actions: standardActions },
+      { module: 'drawings' as ModuleName, actions: ['read' as PermissionAction] },
+      { module: 'dpr' as ModuleName, actions: ['read' as PermissionAction] },
+      { module: 'rfis' as ModuleName, actions: ['read' as PermissionAction] },
+      { module: 'photos' as ModuleName, actions: ['read' as PermissionAction] },
+      { module: 'filemgt' as ModuleName, actions: ['read' as PermissionAction] },
+    ],
+    isSystem: true,
+  },
+  client_representative: {
+    name: 'Client Representative',
+    slug: 'client-representative',
+    description: 'Read-only stakeholder oversight across all stages',
+    permissions: allModules
+      .filter(m => !['roles', 'settings', 'audit_logs'].includes(m))
+      .map(module => ({ module, actions: readOnly })),
+    isSystem: true,
+  },
   viewer: {
     name: 'Viewer',
     slug: 'viewer',

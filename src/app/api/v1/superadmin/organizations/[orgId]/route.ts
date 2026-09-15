@@ -103,7 +103,7 @@ export const PUT = withSuperAdmin(
       const organization = await Organization.findOneAndUpdate(
         { _id: orgId, isDeleted: false },
         { $set: update },
-        { new: true, runValidators: true }
+        { returnDocument: 'after', runValidators: true }
       ).lean();
 
       if (!organization) {

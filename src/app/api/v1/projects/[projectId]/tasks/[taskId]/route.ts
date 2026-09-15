@@ -180,7 +180,7 @@ async function updateTaskHandler(req: NextRequest, context: { params: Promise<Re
     const task = await Task.findOneAndUpdate(
       { _id: taskId, projectId, organizationId, isDeleted: false },
       { $set: updateData },
-      { new: true }
+      { returnDocument: 'after' }
     ).populate('assignees', 'firstName lastName email avatar designation')
      .populate('packageId', 'name trade')
      .populate('dependencies', 'name status progress');
@@ -206,7 +206,7 @@ async function deleteTaskHandler(req: NextRequest, context: { params: Promise<Re
     const task = await Task.findOneAndUpdate(
       { _id: taskId, projectId, organizationId, isDeleted: false },
       { $set: { isDeleted: true, deletedAt: new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!task) {

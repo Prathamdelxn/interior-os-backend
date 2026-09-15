@@ -73,7 +73,7 @@ async function uploadModelHandler(
     const project = await Project.findByIdAndUpdate(
       projectId,
       { $set: { threeDModelUrl: fileUrl } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!project) {

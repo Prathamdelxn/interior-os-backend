@@ -14,9 +14,9 @@ import { successResponse, notFoundResponse, serverErrorResponse, errorResponse }
 import type { JwtPayload } from '@/lib/jwt';
 import { z } from 'zod';
 const updateProjectSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  client: z.string().min(1).max(100).optional(),
-  type: z.enum(['Commercial Office', 'Residential', 'Tech Office', 'General']).optional(),
+  name: z.string().trim().min(3, 'Project name must be at least 3 characters').max(100).optional(),
+  client: z.string().trim().min(2, 'Client name must be at least 2 characters').max(100).optional(),
+  type: z.enum(['Commercial Office', 'Residential', 'Tech Office', 'Co-working Space', 'General']).optional(),
   status: z.enum(['active', 'inactive', 'completed', 'on-hold']).optional(),
   startDate: z.string().transform((val) => new Date(val)).optional(),
   endDate: z.string().transform((val) => new Date(val)).optional(),

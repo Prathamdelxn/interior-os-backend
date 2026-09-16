@@ -20,24 +20,27 @@ import { z } from 'zod';
 import mongoose from 'mongoose';
 
 const createProjectSchema = z.object({
-  name: z.string().min(1, 'Project name is required').max(100),
-  client: z.string().min(1, 'Client name is required').max(100),
-  type: z.enum(['Commercial Office', 'Residential', 'Tech Office', 'General']).default('General'),
-  startDate: z.string().transform((val) => new Date(val)),
-  endDate: z.string().transform((val) => new Date(val)),
+  name: z.string().trim().min(3, 'Project name must be at least 3 characters').max(100, 'Project name cannot exceed 100 characters'),
+  client: z.string().trim().min(2, 'Client name must be at least 2 characters').max(100, 'Client name cannot exceed 100 characters'),
+  type: z.enum(['Commercial Office', 'Residential', 'Tech Office', 'Co-working Space', 'General']).default('General'),
+  startDate: z.string().min(1, 'Start date is required').transform((val) => new Date(val)),
+  endDate: z.string().min(1, 'Target completion date is required').transform((val) => new Date(val)),
   budget: z.object({
-    amount: z.number().nonnegative().default(0),
+    amount: z.number().nonnegative('Budget must be a non-negative number').default(0),
     currency: z.string().default('INR'),
   }).optional(),
   location: z.object({
-    address: z.string().optional(),
-    city: z.string().optional(),
+    address: z.string().max(200).optional(),
+    city: z.string().max(100).optional(),
     state: z.string().optional(),
     country: z.string().optional(),
     zipCode: z.string().optional(),
   }).optional(),
-  description: z.string().optional(),
+  description: z.string().max(1000).optional(),
   templateId: z.string().optional(),
+}).refine((data) => data.endDate >= data.startDate, {
+  message: 'Target completion date cannot be earlier than start date',
+  path: ['endDate'],
 });
 
 // GET: List all projects

@@ -22,10 +22,12 @@ export interface ICrmActivity extends Document {
     | 'Meeting'
     | 'Office Visit'
     | 'Site Visit'
+    | 'Site Survey'
     | 'Email'
     | 'Status Change'
     | 'System Update'
     | 'Requirement Gathering'
+    | '2D/3D Drawing'
     | 'Design Shared';
 
   status: 'Completed' | 'Pending' | 'Missed';
@@ -74,10 +76,12 @@ const CrmActivitySchema = new Schema<ICrmActivity>(
         'Meeting',
         'Office Visit',
         'Site Visit',
+        'Site Survey',
         'Email',
         'Status Change',
         'System Update',
         'Requirement Gathering',
+        '2D/3D Drawing',
         'Design Shared',
       ],
       required: true,
@@ -113,6 +117,10 @@ const CrmActivitySchema = new Schema<ICrmActivity>(
     toObject: { virtuals: true },
   }
 );
+
+if (mongoose.models && (mongoose.models as any).CrmActivity) {
+  delete (mongoose.models as any).CrmActivity;
+}
 
 export const CrmActivity: Model<ICrmActivity> =
   mongoose.models.CrmActivity || mongoose.model<ICrmActivity>('CrmActivity', CrmActivitySchema);

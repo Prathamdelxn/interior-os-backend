@@ -6,7 +6,15 @@ import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
-import { successResponse, createdResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
+import {
+  successResponse,
+  createdResponse,
+  serverErrorResponse,
+  errorResponse,
+  paginatedResponse,
+  buildPaginationMeta,
+  parsePaginationParams,
+} from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import { z } from 'zod';
 
@@ -66,24 +74,133 @@ const createCustomerSchema = z.object({
   remarks: z.string().optional(),
 });
 
-// GET: List all customers/leads
+// GET: List all customers/leads with server-side pagination & filtering
 async function getCustomersHandler(req: NextRequest, _context: any, auth: JwtPayload) {
   try {
     await connectDB();
     const organizationId = getOrganizationId(auth);
 
     const searchParams = req.nextUrl.searchParams;
+    const isAll = searchParams.get('all') === 'true';
     const status = searchParams.get('status');
+    const stage = searchParams.get('stage');
+    const search = searchParams.get('search')?.trim();
+    const { page, limit, sort, order } = parsePaginationParams(searchParams);
+    const skip = (page - 1) * limit;
 
     const query: any = { organizationId };
-    if (status) query.status = status;
 
-    const customers = await CrmCustomer.find(query)
-      .populate('assignedSalesExecutive', 'firstName lastName email')
-      .populate('designerAssigned', 'firstName lastName email')
-      .sort({ createdAt: -1 });
+    // Direct Status filter
+    if (status) {
+      query.status = status;
+    }
 
-    return successResponse(customers);
+    // Pipeline Stage Filter
+    if (stage) {
+      switch (stage) {
+        case 'leads':
+          query.status = { $ne: 'Lost' };
+          break;
+        case 'follow_ups':
+          query.status = { $in: ['New Lead', 'Contacted', 'Meeting Scheduled'] };
+          break;
+        case 'site_visits':
+          query.$or = [
+            { status: { $in: ['Under Site Visit', 'Measurement Done', 'Meeting Scheduled'] } },
+            { 'siteMeasurements.carpetArea': { $exists: true, $ne: '' } },
+          ];
+          break;
+        case 'requirement_design':
+          query.$or = [
+            { status: { $in: ['Under Requirement', 'Requirement Completed'] } },
+            { 'requirements.0': { $exists: true } },
+          ];
+          break;
+        case 'drawing':
+          query.$or = [
+            { status: { $in: ['Under Drawing', 'Design Approved'] } },
+            { 'designFiles.0': { $exists: true } },
+          ];
+          break;
+        case 'boq':
+          query.$or = [
+            { status: 'Under BOQ Creation' },
+            { 'boqs.0': { $exists: true } },
+          ];
+          break;
+        case 'quotations':
+          query.$or = [
+            {
+              status: {
+                $in: [
+                  'Under Quotation',
+                  'Quotation Pending',
+                  'Quotation Sent',
+                  'Negotiation',
+                  'Booking Pending',
+                  'Won',
+                  'Converted',
+                ],
+              },
+            },
+            { 'quotations.0': { $exists: true } },
+          ];
+          break;
+        case 'won_projects':
+          query.status = { $in: ['Won', 'Converted'] };
+          break;
+        case 'lost_leads':
+          query.status = 'Lost';
+          break;
+      }
+    }
+
+    // Search filter across key indexed fields
+    if (search) {
+      const searchRegex = { $regex: search, $options: 'i' };
+      const searchConditions: any[] = [
+        { name: searchRegex },
+        { mobileNumber: searchRegex },
+        { leadNumber: searchRegex },
+        { email: searchRegex },
+        { projectLocation: searchRegex },
+      ];
+
+      if (query.$or) {
+        query.$and = [{ $or: query.$or }, { $or: searchConditions }];
+        delete query.$or;
+      } else {
+        query.$or = searchConditions;
+      }
+    }
+
+    const sortOrder = order === 'asc' ? 1 : -1;
+    const sortConfig: any = { [sort]: sortOrder };
+
+    if (isAll) {
+      const customers = await CrmCustomer.find(query)
+        .populate('assignedSalesExecutive', 'firstName lastName email fullName')
+        .populate('designerAssigned', 'firstName lastName email fullName')
+        .sort(sortConfig)
+        .lean();
+
+      return successResponse(customers);
+    }
+
+    // High performance parallel execution
+    const [total, customers] = await Promise.all([
+      CrmCustomer.countDocuments(query),
+      CrmCustomer.find(query)
+        .populate('assignedSalesExecutive', 'firstName lastName email fullName')
+        .populate('designerAssigned', 'firstName lastName email fullName')
+        .sort(sortConfig)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
+
+    const meta = buildPaginationMeta(total, page, limit);
+    return paginatedResponse(customers, meta, 'Customers retrieved successfully');
   } catch (error) {
     console.error('List CRM customers error:', error);
     return serverErrorResponse();

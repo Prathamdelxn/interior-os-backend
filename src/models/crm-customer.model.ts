@@ -369,6 +369,10 @@ const CrmCustomerSchema = new Schema<ICrmCustomer>(
 );
 
 CrmCustomerSchema.index({ organizationId: 1, leadNumber: 1 }, { unique: true });
+CrmCustomerSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
+CrmCustomerSchema.index({ organizationId: 1, mobileNumber: 1 });
+CrmCustomerSchema.index({ organizationId: 1, name: 1 });
+CrmCustomerSchema.index({ organizationId: 1, createdAt: -1 });
 delete mongoose.models.CrmCustomer;
 export const CrmCustomer: Model<ICrmCustomer> =
   mongoose.models.CrmCustomer || mongoose.model<ICrmCustomer>('CrmCustomer', CrmCustomerSchema);

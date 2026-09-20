@@ -61,6 +61,39 @@ const updateCustomerSchema = z.object({
   lostReason: z.string().optional(),
 });
 
+// GET: Retrieve a single customer lead with full details
+async function getSingleCustomerHandler(
+  _req: NextRequest,
+  context: { params: Promise<Record<string, string>> },
+  auth: JwtPayload
+) {
+  try {
+    await connectDB();
+    const organizationId = getOrganizationId(auth);
+    const { customerId } = await context.params;
+
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+      return errorResponse('Invalid Customer ID', 400);
+    }
+
+    const customer = await CrmCustomer.findOne({ _id: customerId, organizationId })
+      .populate('assignedSalesExecutive', 'firstName lastName email fullName avatar')
+      .populate('designerAssigned', 'firstName lastName email fullName avatar')
+      .populate('createdBy', 'firstName lastName email fullName')
+      .populate('linkedProject', 'name projectNumber status')
+      .lean();
+
+    if (!customer) {
+      return errorResponse('Customer lead not found', 404);
+    }
+
+    return successResponse(customer, 'Customer retrieved successfully');
+  } catch (error: any) {
+    console.error('Get single CRM customer error:', error);
+    return serverErrorResponse();
+  }
+}
+
 // PATCH: Update a Customer (e.g. Status change)
 async function updateCustomerHandler(
   req: NextRequest,
@@ -121,8 +154,14 @@ async function updateCustomerHandler(
       return errorResponse('Customer not found', 404);
     }
 
-    // If status was changed, log an activity automatically
+    // If status was changed, log an activity automatically and auto-complete pending follow-ups if progressed
     if (data.status) {
+      if (!['New Lead', 'Contacted', 'Meeting Scheduled'].includes(data.status)) {
+        await CrmActivity.updateMany(
+          { customer: customer._id, organizationId, status: 'Pending' },
+          { $set: { status: 'Completed', completedDate: new Date() } }
+        );
+      }
       await CrmActivity.create({
         customer: customer._id,
         user: auth.userId,
@@ -186,6 +225,7 @@ async function updateCustomerHandler(
   }
 }
 
+export const GET = withAuth(getSingleCustomerHandler);
 export const PATCH = withAuth(updateCustomerHandler);
 
 // DELETE: Delete a Customer Lead

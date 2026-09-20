@@ -33,7 +33,7 @@ export function generateTokenPair(user: IUser): TokenPair {
 
   const secret: Secret = env.JWT_SECRET;
   const signOptions: SignOptions = {
-    expiresIn: 900, // 15 minutes in seconds
+    expiresIn: 3600, // 1 hour in seconds
   };
 
   const accessToken = jwt.sign(payload as object, secret, signOptions);
@@ -42,7 +42,7 @@ export function generateTokenPair(user: IUser): TokenPair {
 
   // Parse expiry to milliseconds
   const decoded = jwt.decode(accessToken) as jwt.JwtPayload;
-  const accessTokenExpiry = decoded?.exp ? decoded.exp * 1000 : Date.now() + 15 * 60 * 1000;
+  const accessTokenExpiry = decoded?.exp ? decoded.exp * 1000 : Date.now() + 60 * 60 * 1000;
 
   return { accessToken, refreshToken, accessTokenExpiry };
 }

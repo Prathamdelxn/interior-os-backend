@@ -76,6 +76,7 @@ const createActivitySchema = z.object({
   status: z.enum(['Pending', 'Completed', 'Missed']).optional().default('Pending'),
   scheduledDate: z.coerce.date().optional(),
   remarks: z.string().trim().min(2, 'Remarks/notes are required'),
+  user: z.string().optional(),
 });
 
 // POST: Create a new activity/follow-up
@@ -110,7 +111,7 @@ async function createActivityHandler(req: NextRequest, _context: any, auth: JwtP
     const activity: any = await CrmActivity.create({
       ...validData,
       type: validData.type as any,
-      user: auth.userId,
+      user: validData.user || auth.userId,
       organizationId,
       completedDate: validData.status === 'Completed' ? new Date() : undefined,
     });

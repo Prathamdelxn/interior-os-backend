@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
+import { CrmActivity } from '@/models/crm-activity.model';
 import { Project } from '@/models/project.model';
 import { Drawing } from '@/models/drawing.model';
 import { BOQ, BOQItem } from '@/models/boq.model';
@@ -303,6 +304,12 @@ async function convertCustomerHandler(
     }
 
     await customer.save();
+
+    // Auto-complete any remaining pending follow-up activities
+    await CrmActivity.updateMany(
+      { customer: customer._id, organizationId, status: 'Pending' },
+      { $set: { status: 'Completed', completedDate: new Date() } }
+    );
 
     try {
       const { logAuditEvent } = await import('@/services/audit.service');

@@ -35,7 +35,8 @@ const createCustomerSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(2, 'Name must be at least 2 characters long')
+    .min(2, 'Full name must be at least 2 characters long')
+    .max(50, 'Full name cannot exceed 50 characters')
     .refine((val) => !/\d/.test(val), 'Full name cannot contain numbers')
     .refine((val) => /^[a-zA-Z\s'.-]+$/.test(val), 'Full name can only contain letters, spaces, hyphens, and dots'),
   mobileNumber: z
@@ -45,33 +46,44 @@ const createCustomerSchema = z.object({
     .refine((val) => {
       const digitsOnly = val.replace(/\D/g, '');
       return digitsOnly.length >= 10 && digitsOnly.length <= 15;
-    }, 'Please enter a valid mobile number (10 to 15 digits)'),
+    }, 'Please enter a valid mobile number (10 to 15 digits)')
+    .refine((val) => /^\+?[0-9\s-]{10,18}$/.test(val), 'Invalid phone number format'),
   alternateNumber: z
     .string()
     .trim()
     .refine((val) => {
       if (!val) return true;
+      return !/[a-zA-Z]/.test(val);
+    }, 'Alternate number cannot contain letters')
+    .refine((val) => {
+      if (!val) return true;
       const digitsOnly = val.replace(/\D/g, '');
       return digitsOnly.length >= 10 && digitsOnly.length <= 15;
-    }, 'Invalid alternate number')
+    }, 'Alternate number must be 10 to 15 digits')
     .optional()
     .or(z.literal('')),
-  email: z.string().trim().email('Please enter a valid email address').optional().or(z.literal('')),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  pincode: z.string().optional(),
+  email: z
+    .string()
+    .trim()
+    .max(100, 'Email address cannot exceed 100 characters')
+    .email('Please enter a valid email address')
+    .optional()
+    .or(z.literal('')),
+  address: z.string().trim().max(300, 'Address cannot exceed 300 characters').optional(),
+  city: z.string().trim().max(100, 'City cannot exceed 100 characters').optional(),
+  state: z.string().trim().max(100, 'State cannot exceed 100 characters').optional(),
+  pincode: z.string().trim().max(20, 'Pincode cannot exceed 20 characters').optional(),
   propertyType: z.enum(['Flat', 'Villa', 'Office', 'Shop', 'Other']).optional(),
-  propertyAddress: z.string().optional(),
-  projectLocation: z.string().optional(),
+  propertyAddress: z.string().trim().max(300, 'Property address cannot exceed 300 characters').optional(),
+  projectLocation: z.string().trim().max(150, 'Project location cannot exceed 150 characters').optional(),
   assignedSalesExecutive: z.string().optional(),
   designerAssigned: z.string().optional(),
   priority: z.enum(['Low', 'Medium', 'High']).optional(),
-  budgetRange: z.string().optional(),
+  budgetRange: z.string().trim().max(100, 'Budget range cannot exceed 100 characters').optional(),
   possessionDate: z.coerce.date().optional(),
   siteVisitScheduledDate: z.coerce.date().optional(),
   futureFollowUpDate: z.coerce.date().optional(),
-  remarks: z.string().optional(),
+  remarks: z.string().trim().max(1000, 'Remarks cannot exceed 1000 characters').optional(),
 });
 
 // GET: List all customers/leads with server-side pagination & filtering

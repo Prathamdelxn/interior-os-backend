@@ -49,11 +49,42 @@ export interface IRequirement {
   furnitureStyle?: string;
 }
 
-export interface IDesignFile {
+export interface IDrawingVersion {
+  versionNumber: number;
   name: string;
   url: string;
   fileType: string;
-  category?: string;
+  category?: '2D' | '3D' | 'Other';
+  uploadedBy?: mongoose.Types.ObjectId;
+  uploadedAt: Date;
+  approvalStatus: 'draft' | 'pending_internal_approval' | 'internally_approved' | 'internally_rejected';
+  assignedReviewer?: mongoose.Types.ObjectId;
+  assignedReviewerName?: string;
+  approvedBy?: mongoose.Types.ObjectId;
+  approvedAt?: Date;
+  internalNotes?: string;
+  rejectionReason?: string;
+  clientStatus?: 'pending_client_review' | 'client_approved' | 'client_changes_requested';
+  clientFeedback?: string;
+  clientRespondedAt?: Date;
+}
+
+export interface IDesignFile {
+  _id?: mongoose.Types.ObjectId;
+  name: string;
+  title?: string;
+  url: string;
+  fileType: string;
+  category?: '2D' | '3D' | 'Other';
+  discipline?: string;
+  roomTag?: string;
+  currentVersion?: number;
+  assignedReviewer?: mongoose.Types.ObjectId;
+  assignedReviewerName?: string;
+  internalNotes?: string;
+  rejectionReason?: string;
+  status?: 'draft' | 'pending_internal_approval' | 'internally_approved' | 'internally_rejected' | 'client_approved' | 'client_changes_requested';
+  versions?: IDrawingVersion[];
   uploadedAt: Date;
 }
 
@@ -160,9 +191,20 @@ export interface ICrmCustomer extends Document {
   sitePhotos: string[];
 
   requirements: IRequirement[];
+  drawingHandoverNotes?: string;
   designFiles: IDesignFile[];
   boqs: IBoqVersion[];
   quotations: IQuotation[];
+
+  shareSettings?: {
+    shareToken?: string;
+    isPublic: boolean;
+    expiresAt?: Date | null;
+    allowDownload: boolean;
+    includeRequirements: boolean;
+    viewCount: number;
+    lastViewedAt?: Date;
+  };
 
   createdBy: mongoose.Types.ObjectId;
   linkedProject?: mongoose.Types.ObjectId;
@@ -213,11 +255,63 @@ const RequirementSchema = new Schema<IRequirement>({
   furnitureStyle: String,
 });
 
+const DrawingVersionSchema = new Schema<IDrawingVersion>(
+  {
+    versionNumber: { type: Number, required: true, default: 1 },
+    name: { type: String, required: true },
+    url: { type: String, required: true },
+    fileType: { type: String, default: 'image' },
+    category: { type: String, enum: ['2D', '3D', 'Other'], default: '2D' },
+    uploadedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    uploadedAt: { type: Date, default: Date.now },
+    approvalStatus: {
+      type: String,
+      enum: ['draft', 'pending_internal_approval', 'internally_approved', 'internally_rejected'],
+      default: 'draft',
+    },
+    assignedReviewer: { type: Schema.Types.ObjectId, ref: 'User' },
+    assignedReviewerName: { type: String },
+    approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    approvedAt: { type: Date },
+    internalNotes: { type: String },
+    rejectionReason: { type: String },
+    clientStatus: {
+      type: String,
+      enum: ['pending_client_review', 'client_approved', 'client_changes_requested'],
+      default: 'pending_client_review',
+    },
+    clientFeedback: { type: String },
+    clientRespondedAt: { type: Date },
+  },
+  { _id: true }
+);
+
 const DesignFileSchema = new Schema<IDesignFile>({
-  name: String,
-  url: String,
-  fileType: String,
+  name: { type: String, required: true },
+  title: { type: String },
+  url: { type: String, required: true },
+  fileType: { type: String, default: 'image' },
   category: { type: String, enum: ['2D', '3D', 'Other'], default: '2D' },
+  discipline: { type: String, default: 'Architectural' },
+  roomTag: { type: String },
+  currentVersion: { type: Number, default: 1 },
+  assignedReviewer: { type: Schema.Types.ObjectId, ref: 'User' },
+  assignedReviewerName: { type: String },
+  internalNotes: { type: String },
+  rejectionReason: { type: String },
+  status: {
+    type: String,
+    enum: [
+      'draft',
+      'pending_internal_approval',
+      'internally_approved',
+      'internally_rejected',
+      'client_approved',
+      'client_changes_requested',
+    ],
+    default: 'draft',
+  },
+  versions: [DrawingVersionSchema],
   uploadedAt: { type: Date, default: Date.now },
 });
 
@@ -348,9 +442,20 @@ const CrmCustomerSchema = new Schema<ICrmCustomer>(
     sitePhotos: [{ type: String }],
 
     requirements: [RequirementSchema],
+    drawingHandoverNotes: { type: String },
     designFiles: [DesignFileSchema],
     boqs: [CustomerBoqSchema],
     quotations: [QuotationSchema],
+
+    shareSettings: {
+      shareToken: { type: String, unique: true, sparse: true, index: true },
+      isPublic: { type: Boolean, default: false },
+      expiresAt: { type: Date, default: null },
+      allowDownload: { type: Boolean, default: true },
+      includeRequirements: { type: Boolean, default: true },
+      viewCount: { type: Number, default: 0 },
+      lastViewedAt: { type: Date },
+    },
 
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     linkedProject: { type: Schema.Types.ObjectId, ref: 'Project' },

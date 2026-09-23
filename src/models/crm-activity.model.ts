@@ -28,6 +28,8 @@ export interface ICrmActivity extends Document {
     | 'System Update'
     | 'Requirement Gathering'
     | '2D/3D Drawing'
+    | 'Drawing Review'
+    | 'Drawing Approval'
     | 'Design Shared';
 
   status: 'Completed' | 'Pending' | 'Missed';
@@ -82,6 +84,8 @@ const CrmActivitySchema = new Schema<ICrmActivity>(
         'System Update',
         'Requirement Gathering',
         '2D/3D Drawing',
+        'Drawing Review',
+        'Drawing Approval',
         'Design Shared',
       ],
       required: true,

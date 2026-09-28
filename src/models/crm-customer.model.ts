@@ -451,7 +451,7 @@ const CrmCustomerSchema = new Schema<ICrmCustomer>(
       shareToken: { type: String, unique: true, sparse: true, index: true },
       isPublic: { type: Boolean, default: false },
       expiresAt: { type: Date, default: null },
-      allowDownload: { type: Boolean, default: true },
+      allowDownload: { type: Boolean, default: false },
       includeRequirements: { type: Boolean, default: true },
       viewCount: { type: Number, default: 0 },
       lastViewedAt: { type: Date },

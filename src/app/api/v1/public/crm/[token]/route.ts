@@ -114,7 +114,7 @@ export async function GET(
       designFiles: approvedDesignFiles,
       requirements: customer.shareSettings?.includeRequirements ? (customer.requirements || []) : [],
       permissions: {
-        allowDownload: customer.shareSettings?.allowDownload ?? true,
+        allowDownload: customer.shareSettings?.allowDownload ?? false,
         expiresAt: customer.shareSettings?.expiresAt || null,
       },
     });

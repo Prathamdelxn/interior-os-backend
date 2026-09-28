@@ -37,11 +37,15 @@ async function generateShareLinkHandler(
 
     const body = await req.json().catch(() => ({}));
     const {
-      expiresDays = null,
-      allowDownload = true,
+      expiresDays,
+      expiresHours,
+      allowDownload = false,
       includeRequirements = true,
       regenerate = false,
     } = body;
+
+    // Default to 1 hour if neither expiresHours nor expiresDays is provided
+    const effectiveHours = expiresHours !== undefined ? expiresHours : (expiresDays !== undefined ? null : 1);
 
     // Maintain existing token if valid and not asking for regenerate, else create new one
     let token = customer.shareSettings?.shareToken;
@@ -49,7 +53,12 @@ async function generateShareLinkHandler(
       token = `cd_${crypto.randomBytes(16).toString('hex')}`;
     }
 
-    const expiresAt = expiresDays ? new Date(Date.now() + Number(expiresDays) * 24 * 60 * 60 * 1000) : null;
+    let expiresAt: Date | null = null;
+    if (effectiveHours !== null && effectiveHours !== undefined && Number(effectiveHours) > 0) {
+      expiresAt = new Date(Date.now() + Number(effectiveHours) * 60 * 60 * 1000);
+    } else if (expiresDays !== null && expiresDays !== undefined && Number(expiresDays) > 0) {
+      expiresAt = new Date(Date.now() + Number(expiresDays) * 24 * 60 * 60 * 1000);
+    }
 
     customer.shareSettings = {
       shareToken: token,

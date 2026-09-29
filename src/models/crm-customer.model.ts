@@ -360,6 +360,15 @@ const CustomerBoqSchema = new Schema(
     status: { type: String, enum: ['draft', 'pending_approval', 'approved', 'rejected'], default: 'draft' },
     createdAt: { type: Date, default: Date.now },
     notes: String,
+    assignedReviewer: { type: Schema.Types.ObjectId, ref: 'User' },
+    assignedReviewerName: String,
+    submittedAt: Date,
+    submissionNotes: String,
+    approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    approvedByName: String,
+    approvedAt: Date,
+    rejectionReason: String,
+    rejectedAt: Date,
   },
   { _id: false }
 );

@@ -89,40 +89,77 @@ export interface IDesignFile {
 }
 
 export interface IQuotationItem {
+  id?: string;
+  boqItemId?: string;
+  sectionTitle?: string;
+  category?: string;
   description?: string;
   quantity?: number;
+  unit?: string;
   unitPrice?: number;
   total?: number;
 }
 
 export interface IQuotation {
   version?: number;
+  title?: string;
+  sourceBoqVersion?: number;
+  scopeMode?: string;
   items: IQuotationItem[];
   subtotal?: number;
   tax?: number;
   taxPercentage?: number;
   discount?: number;
+  discountAmount?: number;
   grandTotal?: number;
-  status: 'Draft' | 'Sent' | 'Accepted' | 'Rejected';
+  status: 'Generated' | 'Draft' | 'Sent' | 'Accepted' | 'Rejected';
   createdAt: Date;
+  updatedAt?: Date;
   notes?: string;
 }
 
+export interface IBoqAttachment {
+  name: string;
+  url: string;
+  fileType?: string;
+  drawingId?: string;
+}
+
+export interface IBoqSection {
+  sectionId?: string;
+  sectionNumber?: string;
+  sectionTitle: string;
+  scopeDescription?: string;
+  subTotal?: number;
+  attachments?: IBoqAttachment[];
+}
+
 export interface IBoqItem {
+  id?: string;
   serialNumber?: number;
-  category: string;
+  itemCode?: string;
+  category?: string;
+  sectionNumber?: string;
+  sectionTitle?: string;
+  sectionScope?: string;
   itemName: string;
   description?: string;
+  brandMakes?: string;
   quantity: number;
   unit: string;
-  rate: number;
+  rate?: number;
   amount: number;
+  remarks?: string;
+  isHighlighted?: boolean;
 }
 
 export interface IBoqVersion {
   version: number;
+  title?: string;
+  sections?: IBoqSection[];
   items: IBoqItem[];
   totalAmount: number;
+  isUnpriced?: boolean;
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
   createdAt?: Date;
   notes?: string;
@@ -317,8 +354,12 @@ const DesignFileSchema = new Schema<IDesignFile>({
 
 const QuotationItemSchema = new Schema<IQuotationItem>(
   {
+    boqItemId: String,
+    sectionTitle: String,
+    category: String,
     description: String,
     quantity: Number,
+    unit: String,
     unitPrice: Number,
     total: Number,
   },
@@ -327,27 +368,62 @@ const QuotationItemSchema = new Schema<IQuotationItem>(
 
 const QuotationSchema = new Schema<IQuotation>({
   version: Number,
+  title: String,
+  sourceBoqVersion: Number,
+  scopeMode: String,
   items: [QuotationItemSchema],
   subtotal: Number,
   tax: Number,
   taxPercentage: Number,
   discount: Number,
+  discountAmount: Number,
   grandTotal: Number,
-  status: { type: String, enum: ['Draft', 'Sent', 'Accepted', 'Rejected'], default: 'Sent' },
+  status: { type: String, enum: ['Generated', 'Draft', 'Sent', 'Accepted', 'Rejected'], default: 'Generated' },
   createdAt: { type: Date, default: Date.now },
+  updatedAt: Date,
   notes: String,
 });
 
+const BoqAttachmentSchema = new Schema(
+  {
+    name: String,
+    url: String,
+    fileType: String,
+    drawingId: String,
+  },
+  { _id: false }
+);
+
+const BoqSectionSchema = new Schema(
+  {
+    sectionId: String,
+    sectionNumber: String,
+    sectionTitle: { type: String, required: true },
+    scopeDescription: String,
+    subTotal: { type: Number, default: 0 },
+    attachments: [BoqAttachmentSchema],
+  },
+  { _id: false }
+);
+
 const BoqItemSchema = new Schema(
   {
+    id: String,
     serialNumber: Number,
+    itemCode: String,
     category: String,
+    sectionNumber: String,
+    sectionTitle: String,
+    sectionScope: String,
     itemName: String,
     description: String,
-    quantity: Number,
+    brandMakes: String,
+    quantity: { type: Number, default: 0 },
     unit: String,
-    rate: Number,
-    amount: Number,
+    rate: { type: Number, default: 0 },
+    amount: { type: Number, default: 0 },
+    remarks: String,
+    isHighlighted: Boolean,
   },
   { _id: false }
 );
@@ -355,8 +431,11 @@ const BoqItemSchema = new Schema(
 const CustomerBoqSchema = new Schema(
   {
     version: Number,
+    title: String,
+    sections: [BoqSectionSchema],
     items: [BoqItemSchema],
     totalAmount: Number,
+    isUnpriced: { type: Boolean, default: false },
     status: { type: String, enum: ['draft', 'pending_approval', 'approved', 'rejected'], default: 'draft' },
     createdAt: { type: Date, default: Date.now },
     notes: String,

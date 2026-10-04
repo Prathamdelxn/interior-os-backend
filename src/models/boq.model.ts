@@ -110,13 +110,19 @@ export interface IBOQItem extends Document {
   projectId: mongoose.Types.ObjectId;
   boqId: mongoose.Types.ObjectId;
   serialNumber: number;
+  itemCode?: string;
   category: string;
+  sectionNumber?: string;
+  sectionTitle?: string;
+  sectionScope?: string;
   itemName: string;
   description?: string;
+  brandMakes?: string;
   quantity: number;
   unit: string;
-  rate: number;
+  rate?: number;
   amount: number;
+  remarks?: string;
 
   // BOQ vs Actual tracking
   consumedQuantity: number;
@@ -141,13 +147,19 @@ const BOQItemSchema = new Schema<IBOQItem>(
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     boqId: { type: Schema.Types.ObjectId, ref: 'BOQ', required: true, index: true },
     serialNumber: { type: Number, required: true },
+    itemCode: { type: String, trim: true },
     category: { type: String, required: true, trim: true },
+    sectionNumber: { type: String, trim: true },
+    sectionTitle: { type: String, trim: true },
+    sectionScope: { type: String, trim: true },
     itemName: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
+    brandMakes: { type: String, trim: true },
     quantity: { type: Number, required: true, min: 0 },
     unit: { type: String, required: true, trim: true },
-    rate: { type: Number, required: true, min: 0 },
-    amount: { type: Number, required: true, min: 0 },
+    rate: { type: Number, default: 0, min: 0 },
+    amount: { type: Number, default: 0, min: 0 },
+    remarks: { type: String, trim: true },
 
     // BOQ vs Actual
     consumedQuantity: { type: Number, default: 0, min: 0 },

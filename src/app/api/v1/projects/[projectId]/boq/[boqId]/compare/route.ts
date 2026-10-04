@@ -61,7 +61,7 @@ async function compareBoqHandler(req: NextRequest, context: { params: Promise<Re
             old: { quantity: itemA.quantity, unit: itemA.unit, rate: itemA.rate, amount: itemA.amount },
             new: { quantity: itemB.quantity, unit: itemB.unit, rate: itemB.rate, amount: itemB.amount },
             qtyDelta: itemB.quantity - itemA.quantity,
-            rateDelta: itemB.rate - itemA.rate,
+            rateDelta: (itemB.rate || 0) - (itemA.rate || 0),
             amountDelta: itemB.amount - itemA.amount,
           });
         } else {

@@ -26,6 +26,9 @@ export const signupSchema = z.object({
     ])
     .optional()
     .default('Interior Fit-Out'),
+  country: z.string().trim().optional(),
+  currency: z.string().trim().optional().default('INR'),
+  timezone: z.string().trim().optional().default('Asia/Kolkata'),
 
   // User fields
   firstName: z

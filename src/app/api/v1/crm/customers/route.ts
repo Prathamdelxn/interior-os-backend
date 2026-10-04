@@ -191,6 +191,7 @@ async function getCustomersHandler(req: NextRequest, _context: any, auth: JwtPay
 
     if (isAll) {
       const customers = await CrmCustomer.find(query)
+        .select('-sitePhotos')
         .populate('assignedSalesExecutive', 'firstName lastName email fullName')
         .populate('designerAssigned', 'firstName lastName email fullName')
         .sort(sortConfig)
@@ -203,6 +204,7 @@ async function getCustomersHandler(req: NextRequest, _context: any, auth: JwtPay
     const [total, customers] = await Promise.all([
       CrmCustomer.countDocuments(query),
       CrmCustomer.find(query)
+        .select('-sitePhotos')
         .populate('assignedSalesExecutive', 'firstName lastName email fullName')
         .populate('designerAssigned', 'firstName lastName email fullName')
         .sort(sortConfig)

@@ -148,8 +148,17 @@ export function quotationInvoiceEmailTemplate(
     notes?: string;
     createdAt?: Date | string;
   },
-  companyName: string = 'SkyStruct-Lite Interior'
+  companyName: string = 'SkyStruct-Lite Interior',
+  options?: {
+    customMessage?: string;
+    recipientName?: string;
+    recipientType?: string;
+  }
 ): string {
+  const customMessage = options?.customMessage?.trim();
+  const recipientName = options?.recipientName?.trim();
+  const recipientType = options?.recipientType || 'customer';
+
   const formattedItems = (quotation.items || []).map((item: any, idx) => {
     const desc = item.description || item.itemName || item.name || `Item ${idx + 1}`;
     const qty = Number(item.quantity) || 1;
@@ -182,7 +191,7 @@ export function quotationInvoiceEmailTemplate(
             <tr>
               <td>
                 <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff;">${companyName}</h1>
-                <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Proforma Invoice & Quotation</p>
+                <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Commercial Quotation & Scope of Work</p>
               </td>
               <td align="right" valign="top">
                 <span style="display: inline-block; background-color: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 700; color: #38bdf8;">
@@ -193,13 +202,28 @@ export function quotationInvoiceEmailTemplate(
           </table>
         </div>
 
+        <!-- Custom Message Banner if provided -->
+        ${customMessage ? `
+          <div style="margin: 20px 32px 0; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px 18px;">
+            <p style="margin: 0 0 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1d4ed8; letter-spacing: 0.5px;">Message / Note</p>
+            <p style="margin: 0; font-size: 13px; color: #1e3a8a; line-height: 1.5; white-space: pre-wrap;">${customMessage}</p>
+          </div>
+        ` : ''}
+
         <!-- Details Section -->
         <div style="padding: 24px 32px 16px; background-color: #ffffff;">
           <table width="100%" border="0" cellspacing="0" cellpadding="0">
             <tr>
               <td valign="top" width="50%">
-                <p style="margin: 0; font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Billed To</p>
+                <p style="margin: 0; font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">
+                  ${recipientType === 'vendor' ? 'Project / Client' : 'Billed To'}
+                </p>
                 <p style="margin: 4px 0 0; font-size: 15px; font-weight: 700; color: #0f172a;">${customerName}</p>
+                ${recipientName && recipientType !== 'customer' ? `
+                  <p style="margin: 6px 0 0; font-size: 12px; color: #64748b;">
+                    <span style="font-weight: 600;">Recipient:</span> ${recipientName} (${recipientType.toUpperCase()})
+                  </p>
+                ` : ''}
               </td>
               <td valign="top" width="50%" align="right">
                 <p style="margin: 0; font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Quotation Date</p>
@@ -278,4 +302,318 @@ export function quotationInvoiceEmailTemplate(
     </div>
   `;
 }
+
+export function generateQuotationStandaloneDocumentHtml(
+  customerName: string,
+  quotation: {
+    version: number;
+    quotationNumber?: string;
+    title?: string;
+    items: Array<{ description?: string; itemName?: string; name?: string; quantity?: any; unitPrice?: any; rate?: any; total?: any; amount?: any; unit?: string }>;
+    subtotal: number;
+    taxPercentage: number;
+    tax?: number;
+    discount?: number;
+    grandTotal?: number;
+    notes?: string;
+    createdAt?: Date | string;
+  },
+  companyName: string = 'SkyStruct Interior',
+  options?: {
+    customMessage?: string;
+    recipientName?: string;
+    recipientType?: string;
+  }
+): string {
+  const qtnNum = quotation.quotationNumber || `QTN-V${quotation.version || 1}`;
+  const dateStr = new Date(quotation.createdAt || Date.now()).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  });
+  const recipientName = options?.recipientName?.trim();
+  const recipientType = options?.recipientType || 'customer';
+  const customMessage = options?.customMessage?.trim();
+
+  const formattedItems = (quotation.items || []).map((item: any, idx) => {
+    const desc = item.description || item.itemName || item.name || `Item ${idx + 1}`;
+    const qty = Number(item.quantity) || 1;
+    const price = Number(item.unitPrice || item.rate) || 0;
+    const total = Number(item.total || item.amount) || (qty * price);
+    const unit = item.unit || 'Nos';
+    return `
+      <tr>
+        <td style="text-align: center; color: #64748b; font-size: 12px;">${idx + 1}</td>
+        <td>
+          <div style="font-weight: 600; color: #0f172a; font-size: 13px;">${desc}</div>
+        </td>
+        <td style="text-align: center; font-size: 13px; color: #334155;">${qty} <span style="font-size: 10px; color: #94a3b8;">${unit}</span></td>
+        <td style="text-align: right; font-size: 13px; color: #334155;">₹${price.toLocaleString('en-IN')}</td>
+        <td style="text-align: right; font-weight: 700; font-size: 13px; color: #0f172a;">₹${total.toLocaleString('en-IN')}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${qtnNum} - ${customerName} - ${companyName}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      padding: 32px;
+      line-height: 1.5;
+    }
+    .doc-container {
+      max-width: 850px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px -2px rgba(0,0,0,0.06);
+    }
+    .doc-header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+      padding: 36px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .brand-title {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+    }
+    .brand-subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    .badge-qtn {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 14px;
+      text-align: right;
+    }
+    .doc-body {
+      padding: 36px 40px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #f1f5f9;
+      margin-bottom: 28px;
+    }
+    .meta-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      font-weight: 700;
+    }
+    .meta-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 4px;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 28px;
+    }
+    .items-table th {
+      background: #f8fafc;
+      color: #475569;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 700;
+      padding: 12px 14px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .items-table td {
+      padding: 14px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    .totals-wrapper {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 32px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .totals-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .totals-table td {
+      padding: 6px 0;
+      font-size: 13px;
+    }
+    .grand-total-row td {
+      border-top: 2px solid #0f172a;
+      padding-top: 12px;
+      font-size: 18px;
+      font-weight: 800;
+      color: #2563eb;
+    }
+    .notes-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+    .signatures-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      margin-top: 48px;
+      padding-top: 32px;
+      border-top: 1px dashed #cbd5e1;
+    }
+    .sig-line {
+      border-top: 1px solid #94a3b8;
+      margin-top: 40px;
+      padding-top: 8px;
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 600;
+    }
+    @media print {
+      body { background: #ffffff; padding: 0; }
+      .doc-container { border: none; box-shadow: none; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="doc-container">
+    <div class="doc-header">
+      <div>
+        <div class="brand-title">${companyName}</div>
+        <div class="brand-subtitle">Commercial Quotation & Scope of Work</div>
+      </div>
+      <div class="badge-qtn">
+        ${qtnNum}
+      </div>
+    </div>
+
+    <div class="doc-body">
+      ${customMessage ? `
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px 18px; margin-bottom: 24px;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1d4ed8; letter-spacing: 0.5px;">Message / Note:</div>
+          <div style="font-size: 13px; color: #1e3a8a; margin-top: 4px; white-space: pre-wrap;">${customMessage}</div>
+        </div>
+      ` : ''}
+
+      <div class="meta-grid">
+        <div>
+          <div class="meta-label">${recipientType === 'vendor' ? 'Project / Client' : 'Client Name'}</div>
+          <div class="meta-value">${customerName}</div>
+          ${recipientName && recipientType !== 'customer' ? `
+            <div style="font-size: 13px; color: #475569; margin-top: 4px;">
+              <strong>Recipient:</strong> ${recipientName} (${recipientType.toUpperCase()})
+            </div>
+          ` : ''}
+        </div>
+        <div style="text-align: right;">
+          <div class="meta-label">Quotation Date</div>
+          <div class="meta-value">${dateStr}</div>
+          <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+            Document Version: v${quotation.version || 1}
+          </div>
+        </div>
+      </div>
+
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th style="width: 48px; text-align: center;">#</th>
+            <th style="text-align: left;">Scope / Item Description</th>
+            <th style="width: 80px; text-align: center;">Qty</th>
+            <th style="width: 130px; text-align: right;">Rate</th>
+            <th style="width: 140px; text-align: right;">Total Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${formattedItems}
+        </tbody>
+      </table>
+
+      <div class="totals-wrapper">
+        <div>
+          ${quotation.notes ? `
+            <div class="notes-box">
+              <div class="meta-label" style="margin-bottom: 6px;">Terms, Inclusions & Notes:</div>
+              <div style="font-size: 12px; color: #475569; line-height: 1.6; white-space: pre-wrap;">${quotation.notes}</div>
+            </div>
+          ` : `
+            <div class="notes-box">
+              <div class="meta-label" style="margin-bottom: 4px;">Payment & Execution Terms:</div>
+              <div style="font-size: 12px; color: #64748b; line-height: 1.5;">
+                • Quotation validity: 15 days from issue date.<br>
+                • Work shall commence upon advance payment and design sign-off.
+              </div>
+            </div>
+          `}
+        </div>
+
+        <div>
+          <table class="totals-table">
+            <tr>
+              <td style="color: #64748b;">Subtotal:</td>
+              <td style="text-align: right; font-weight: 600; color: #334155;">₹${(quotation.subtotal || 0).toLocaleString('en-IN')}</td>
+            </tr>
+            ${quotation.taxPercentage ? `
+              <tr>
+                <td style="color: #64748b;">GST (${quotation.taxPercentage}%):</td>
+                <td style="text-align: right; font-weight: 600; color: #334155;">₹${(quotation.tax || 0).toLocaleString('en-IN')}</td>
+              </tr>
+            ` : ''}
+            ${quotation.discount ? `
+              <tr>
+                <td style="color: #059669;">Discount:</td>
+                <td style="text-align: right; font-weight: 600; color: #059669;">-₹${(quotation.discount || 0).toLocaleString('en-IN')}</td>
+              </tr>
+            ` : ''}
+            <tr class="grand-total-row">
+              <td>Grand Total:</td>
+              <td style="text-align: right;">₹${(quotation.grandTotal || 0).toLocaleString('en-IN')}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="signatures-section">
+        <div>
+          <div class="sig-line">Prepared & Authorized By (${companyName})</div>
+        </div>
+        <div>
+          <div class="sig-line" style="text-align: right;">Client Acceptance Sign & Date</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 

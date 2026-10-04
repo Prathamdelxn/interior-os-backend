@@ -90,6 +90,15 @@ export async function signup(input: SignupInput) {
     name: input.organizationName,
     slug,
     industry: input.industry || 'Interior Fit-Out',
+    address: {
+      country: input.country || 'India',
+    },
+    settings: {
+      currency: input.currency || 'INR',
+      timezone: input.timezone || 'Asia/Kolkata',
+      dateFormat: 'DD/MM/YYYY',
+      language: 'en',
+    },
     subscription: {
       plan: 'free',
       status: 'trial',
@@ -237,6 +246,8 @@ export async function login(input: LoginInput, deviceInfo?: { userAgent?: string
           name: organization.name,
           slug: organization.slug,
           logo: organization.logo,
+          address: organization.address,
+          settings: organization.settings,
         }
       : null,
     tokens: {
@@ -399,6 +410,8 @@ export async function verifyEmail(email: string, otp: string) {
           name: organization.name,
           slug: organization.slug,
           logo: organization.logo,
+          address: organization.address,
+          settings: organization.settings,
         }
       : null,
     tokens: {

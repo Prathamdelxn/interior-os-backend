@@ -22,6 +22,8 @@ export interface IPurchaseOrder extends Document {
     unitPrice: number;
     amount: number;
   }>;
+  grns?: Array<any>;
+  grnData?: any;
   isDeleted: boolean;
   deletedAt?: Date;
   createdAt: Date;
@@ -53,6 +55,8 @@ const PurchaseOrderSchema = new Schema<IPurchaseOrder>(
         amount: { type: Number, required: true, min: 0 },
       },
     ],
+    grns: { type: [Schema.Types.Mixed], default: [] },
+    grnData: { type: Schema.Types.Mixed },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: Date,
   },

@@ -366,23 +366,31 @@ const QuotationItemSchema = new Schema<IQuotationItem>(
   { _id: false }
 );
 
-const QuotationSchema = new Schema<IQuotation>({
-  version: Number,
-  title: String,
-  sourceBoqVersion: Number,
-  scopeMode: String,
-  items: [QuotationItemSchema],
-  subtotal: Number,
-  tax: Number,
-  taxPercentage: Number,
-  discount: Number,
-  discountAmount: Number,
-  grandTotal: Number,
-  status: { type: String, enum: ['Generated', 'Draft', 'Sent', 'Accepted', 'Rejected'], default: 'Generated' },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: Date,
-  notes: String,
-});
+const QuotationSchema = new Schema<IQuotation>(
+  {
+    version: Number,
+    title: String,
+    sourceBoqVersion: Number,
+    scopeMode: String,
+    items: [QuotationItemSchema],
+    subtotal: Number,
+    tax: Number,
+    taxPercentage: Number,
+    discount: Number,
+    discountAmount: Number,
+    grandTotal: Number,
+    status: { type: String, enum: ['Generated', 'Draft', 'Sent', 'Accepted', 'Rejected'], default: 'Generated' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: Date,
+    notes: String,
+    vendorQuotes: [Schema.Types.Mixed],
+    attachments: [Schema.Types.Mixed],
+    dispatches: [Schema.Types.Mixed],
+    sentToClient: Schema.Types.Mixed,
+    sentVendors: [Schema.Types.Mixed],
+  },
+  { strict: false }
+);
 
 const BoqAttachmentSchema = new Schema(
   {

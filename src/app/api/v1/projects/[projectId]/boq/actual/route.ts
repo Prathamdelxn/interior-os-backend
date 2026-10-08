@@ -85,9 +85,9 @@ async function boqActualHandler(req: NextRequest, context: { params: Promise<Rec
         plannedQuantity: item.quantity,
         plannedAmount: item.amount,
         consumedQuantity: consumedQty,
-        consumedAmount: consumedQty * item.rate,
+        consumedAmount: consumedQty * (item.rate || 0),
         remainingQuantity: remaining,
-        remainingAmount: remaining * item.rate,
+        remainingAmount: remaining * (item.rate || 0),
         variancePercentage: Math.round(variance * 100) / 100,
         status,
       };

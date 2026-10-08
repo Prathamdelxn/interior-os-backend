@@ -124,7 +124,7 @@ async function updateItemsHandler(req: NextRequest, context: { params: Promise<R
       if (update.description !== undefined) item.description = update.description;
       if (update.unit) item.unit = update.unit;
 
-      item.amount = item.quantity * item.rate;
+      item.amount = item.quantity * (item.rate || 0);
       item.remainingQuantity = item.quantity - item.consumedQuantity;
       item.variancePercentage = item.quantity > 0
         ? ((item.consumedQuantity - item.quantity) / item.quantity) * 100

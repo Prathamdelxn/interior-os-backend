@@ -115,20 +115,24 @@ async function getGlobalDashboardHandler(req: NextRequest, _context: any, auth: 
     const activeProjects = allProjects.filter(p => p.status === 'active');
     const activeProjectsCount = activeProjects.length;
 
-    // Build query for other tables that limits them to user's projects
-    const scopeQuery: any = { organizationId: orgMatchFilter, isDeleted: false };
-    if (projectFilter._id) {
-      scopeQuery.projectId = projectFilter._id;
-    }
+    // Build query for other tables that strictly limits them to valid non-deleted projects
+    const validProjectIds = allProjects.map((p) => p._id);
+    const scopeQuery: any = {
+      organizationId: orgMatchFilter,
+      isDeleted: false,
+      projectId: { $in: validProjectIds },
+    };
 
-    // 2b. Count metrics in parallel instead of sequential
-    const [openSnags, openRFIs, criticalRisks, procurementPending, allPOs] = await Promise.all([
-      Snag.countDocuments({ ...scopeQuery, status: { $in: ['open', 'assigned', 'in_progress'] } }),
-      RFI.countDocuments({ ...scopeQuery, status: 'open' }),
-      Risk.countDocuments({ ...scopeQuery, status: 'open', score: { $gte: 6 } }),
-      PurchaseOrder.countDocuments({ ...scopeQuery, status: 'pending' }),
-      PurchaseOrder.find({ ...scopeQuery }).select('status').lean(),
-    ]);
+    // 2b. Count metrics in parallel (instantly 0 if no active projects)
+    const [openSnags, openRFIs, criticalRisks, procurementPending, allPOs] = validProjectIds.length > 0
+      ? await Promise.all([
+          Snag.countDocuments({ ...scopeQuery, status: { $in: ['open', 'assigned', 'in_progress'] } }),
+          RFI.countDocuments({ ...scopeQuery, status: 'open' }),
+          Risk.countDocuments({ ...scopeQuery, status: 'open', score: { $gte: 6 } }),
+          PurchaseOrder.countDocuments({ ...scopeQuery, status: 'pending' }),
+          PurchaseOrder.find({ ...scopeQuery }).select('status').lean(),
+        ])
+      : [0, 0, 0, 0, []];
 
     // 3. Project Health Evaluation
     let onTrackCount = 0;

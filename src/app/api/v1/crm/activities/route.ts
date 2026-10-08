@@ -25,6 +25,11 @@ async function getActivitiesHandler(req: NextRequest, _context: any, auth: JwtPa
 
     if (customerId) {
       query.customer = customerId;
+      const activities = await CrmActivity.find(query)
+        .populate('user', 'firstName lastName email')
+        .sort({ updatedAt: -1, scheduledDate: -1, createdAt: -1 })
+        .lean();
+      return successResponse(activities);
     } else {
       // For general follow-ups view, exclude Site Visit transitions and system updates
       query.type = { $nin: ['Site Visit', 'Status Change', 'System Update'] };
@@ -40,7 +45,8 @@ async function getActivitiesHandler(req: NextRequest, _context: any, auth: JwtPa
         populate: { path: 'assignedSalesExecutive', select: 'firstName lastName email' },
       })
       .populate('user', 'firstName lastName email')
-      .sort({ updatedAt: -1, scheduledDate: -1, createdAt: -1 });
+      .sort({ updatedAt: -1, scheduledDate: -1, createdAt: -1 })
+      .lean();
 
     // When querying across all customers, deduplicate so each lead appears at most once
     if (!customerId) {

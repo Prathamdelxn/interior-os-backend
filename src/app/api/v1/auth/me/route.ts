@@ -47,6 +47,7 @@ async function handler(_req: NextRequest, _context: { params: Promise<Record<str
             logo: organization.logo,
             industry: organization.industry,
             subscription: organization.subscription,
+            address: organization.address,
             settings: organization.settings,
           }
         : null,

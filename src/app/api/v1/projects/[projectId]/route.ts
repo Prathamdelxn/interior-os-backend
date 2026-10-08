@@ -7,6 +7,12 @@ import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
 import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Project } from '@/models/project.model';
+import { Snag } from '@/models/snag.model';
+import { Task } from '@/models/task.model';
+import { Milestone } from '@/models/milestone.model';
+import { RFI } from '@/models/rfi.model';
+import { Risk } from '@/models/risk.model';
+import { PurchaseOrder } from '@/models/purchase-order.model';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { CrmActivity } from '@/models/crm-activity.model';
 import { calculateProjectMetrics } from '@/services/project-metrics.service';
@@ -132,6 +138,16 @@ async function deleteProjectHandler(req: NextRequest, context: { params: Promise
     if (!project) {
       return notFoundResponse('Project not found');
     }
+
+    // Cascade soft-delete all child records belonging to this project
+    await Promise.allSettled([
+      Snag.updateMany({ projectId, organizationId }, { $set: { isDeleted: true, deletedAt: new Date() } }),
+      Task.updateMany({ projectId, organizationId }, { $set: { isDeleted: true, deletedAt: new Date() } }),
+      Milestone.updateMany({ projectId, organizationId }, { $set: { isDeleted: true, deletedAt: new Date() } }),
+      RFI.updateMany({ projectId, organizationId }, { $set: { isDeleted: true, deletedAt: new Date() } }),
+      Risk.updateMany({ projectId, organizationId }, { $set: { isDeleted: true, deletedAt: new Date() } }),
+      PurchaseOrder.updateMany({ projectId, organizationId }, { $set: { isDeleted: true, deletedAt: new Date() } }),
+    ]);
 
     // Unlock any CRM Lead / Customer linked to this project
     const linkedCustomers = await CrmCustomer.find({

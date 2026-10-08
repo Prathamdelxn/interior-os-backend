@@ -18,6 +18,8 @@ import { z } from 'zod';
 const incomingSchema = z.object({
   type: z.literal('incoming'),
   invoiceNo: z.string().optional(),
+  projectName: z.string().optional(),
+  projectLocation: z.string().optional(),
   milestoneName: z.string().min(1, 'Milestone name is required'),
   amount: z.number().positive('Amount must be positive'),
   paymentDate: z.string().transform((v) => new Date(v)),
@@ -29,6 +31,9 @@ const incomingSchema = z.object({
 const outgoingSchema = z.object({
   type: z.literal('outgoing'),
   poNo: z.string().optional(),
+  invoiceNo: z.string().optional(),
+  projectName: z.string().optional(),
+  projectLocation: z.string().optional(),
   vendorName: z.string().min(1, 'Vendor name is required'),
   category: z.string().min(1, 'Category is required'),
   amount: z.number().positive('Amount must be positive'),
@@ -41,6 +46,9 @@ const outgoingSchema = z.object({
 const debitNoteSchema = z.object({
   type: z.literal('debit_note'),
   debitNoteNo: z.string().optional(),
+  invoiceNo: z.string().optional(),
+  projectName: z.string().optional(),
+  projectLocation: z.string().optional(),
   vendorName: z.string().min(1, 'Vendor name is required'),
   reason: z.string().min(1, 'Reason is required'),
   amount: z.number().positive('Amount must be positive'),

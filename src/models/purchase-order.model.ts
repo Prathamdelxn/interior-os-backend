@@ -13,7 +13,7 @@ export interface IPurchaseOrder extends Document {
   materialName: string;
   amount: number;
   currency: string;
-  status: 'requested' | 'pending' | 'approved' | 'ordered' | 'dispatched' | 'partially_delivered' | 'delivered' | 'rejected';
+  status: 'requested' | 'rfq' | 'pending' | 'approved' | 'ordered' | 'dispatched' | 'partially_delivered' | 'delivered' | 'rejected';
   deliveryDate?: Date;
   items: Array<{
     name: string;
@@ -24,6 +24,18 @@ export interface IPurchaseOrder extends Document {
   }>;
   grns?: Array<any>;
   grnData?: any;
+  quotes?: Array<{
+    vendorName: string;
+    contactInfo: string;
+    remarks?: string;
+    submittedAt: Date;
+    rates: Array<{
+      itemId: string;
+      name: string;
+      unitPrice: number;
+    }>;
+  }>;
+
   isDeleted: boolean;
   deletedAt?: Date;
   createdAt: Date;
@@ -41,7 +53,7 @@ const PurchaseOrderSchema = new Schema<IPurchaseOrder>(
     currency: { type: String, default: 'INR' },
     status: {
       type: String,
-      enum: ['requested', 'pending', 'approved', 'ordered', 'dispatched', 'partially_delivered', 'delivered', 'rejected'],
+      enum: ['requested', 'rfq', 'pending', 'approved', 'ordered', 'dispatched', 'partially_delivered', 'delivered', 'rejected'],
       default: 'pending',
       index: true,
     },
@@ -57,6 +69,25 @@ const PurchaseOrderSchema = new Schema<IPurchaseOrder>(
     ],
     grns: { type: [Schema.Types.Mixed], default: [] },
     grnData: { type: Schema.Types.Mixed },
+    quotes: {
+      type: [
+        {
+          vendorName: { type: String, required: true },
+          contactInfo: { type: String, required: true },
+          remarks: { type: String },
+          submittedAt: { type: Date, default: Date.now },
+          rates: [
+            {
+              itemId: { type: String },
+              name: { type: String },
+              unitPrice: { type: Number, required: true, min: 0 }
+            }
+          ]
+        }
+      ],
+      default: []
+    },
+
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: Date,
   },

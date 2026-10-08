@@ -12,6 +12,7 @@ const sendRfqSchema = z.object({
   poId: z.string().min(1, 'poId is required'),
   vendorIds: z.array(z.string()).min(1, 'At least one vendorId is required'),
   notes: z.string().optional(),
+  rfqLink: z.string().url().optional(),
 });
 
 async function sendRfqHandler(req: NextRequest, _context: any, auth: JwtPayload) {
@@ -25,7 +26,7 @@ async function sendRfqHandler(req: NextRequest, _context: any, auth: JwtPayload)
       return errorResponse(validation.error.issues[0].message, 400);
     }
 
-    const { poId, vendorIds, notes } = validation.data;
+    const { poId, vendorIds, notes, rfqLink } = validation.data;
 
     // 1. Fetch Purchase Order
     const po = await PurchaseOrder.findOne({
@@ -77,7 +78,7 @@ async function sendRfqHandler(req: NextRequest, _context: any, auth: JwtPayload)
     `;
 
     const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; color: #333;">
+      <div style="font-family: Arial, sans-serif; background-color: #ffffff; max-width: 650px; margin: 0 auto; padding: 20px; color: #333;">
         <h2>Request for Quotation (RFQ)</h2>
         <p>Dear Vendor,</p>
         <p>Please provide a quotation for the following materials requested for PO <strong>${po.poNumber}</strong>:</p>
@@ -85,6 +86,14 @@ async function sendRfqHandler(req: NextRequest, _context: any, auth: JwtPayload)
         ${itemsHtml}
 
         ${notes ? `<p style="margin-top: 20px;"><strong>Additional Notes:</strong><br/>${notes}</p>` : ''}
+        ${rfqLink ? `
+        <div style="margin-top: 25px; margin-bottom: 25px; text-align: center;">
+          <a href="${rfqLink}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            Submit Quotation Form
+          </a>
+          <p style="margin-top: 10px; font-size: 12px; color: #666;">Or copy this link: <a href="${rfqLink}">${rfqLink}</a></p>
+        </div>
+        ` : ''}
         
         <p style="margin-top: 30px;">Looking forward to your response.</p>
         <p>Regards,<br/>InteriorOS Team</p>

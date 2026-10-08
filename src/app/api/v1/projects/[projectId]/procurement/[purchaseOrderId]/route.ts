@@ -12,7 +12,7 @@ import type { JwtPayload } from '@/lib/jwt';
 import { z } from 'zod';
 
 const updatePoSchema = z.object({
-  status: z.enum(['requested', 'pending', 'approved', 'ordered', 'dispatched', 'partially_delivered', 'delivered', 'rejected']).optional(),
+  status: z.enum(['requested', 'rfq', 'pending', 'approved', 'ordered', 'dispatched', 'partially_delivered', 'delivered', 'rejected']).optional(),
   vendorName: z.string().optional(),
   deliveryDate: z.union([z.string(), z.date()]).transform((val) => new Date(val)).optional(),
   items: z.array(z.any()).optional(),

@@ -22,6 +22,10 @@ export interface IPayment extends Document {
   poNo?: string;        // For outgoing
   debitNoteNo?: string; // For debit note
 
+  // Project details
+  projectName?: string;
+  projectLocation?: string;
+
   // Common fields
   amount: number;
   paymentMethod?: PaymentMethod;
@@ -59,6 +63,9 @@ const PaymentSchema = new Schema<IPayment>(
     invoiceNo: { type: String, trim: true },
     poNo: { type: String, trim: true },
     debitNoteNo: { type: String, trim: true },
+
+    projectName: { type: String, trim: true },
+    projectLocation: { type: String, trim: true },
 
     amount: { type: Number, required: true, min: 0 },
     paymentMethod: { type: String, enum: ['Bank Transfer', 'UPI', 'Cheque', 'Cash', 'RTGS/NEFT'] },

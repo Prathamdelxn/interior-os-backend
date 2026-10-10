@@ -14,16 +14,31 @@ async function uploadHandoverDocumentHandler(
   auth: JwtPayload
 ) {
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
+    const contentType = req.headers.get('content-type') || '';
+    let buffer: Buffer;
+    let filename = 'document.pdf';
 
-    if (!file) {
-      return errorResponse('No file provided', 400);
+    if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await req.formData();
+      const file = formData.get('file') as File | null;
+
+      if (!file) {
+        return errorResponse('No file provided in form data', 400);
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+      filename = file.name || 'document.pdf';
+    } else {
+      const body = await req.json().catch(() => ({}));
+      if (body.base64) {
+        const base64Data = body.base64.replace(/^data:.*?;base64,/, '');
+        buffer = Buffer.from(base64Data, 'base64');
+        filename = body.filename || 'document.pdf';
+      } else {
+        return errorResponse('Content-Type must be multipart/form-data or include base64 payload', 400);
+      }
     }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const filename = file.name || 'document.pdf';
 
     // Upload to Cloudinary inside handover folder
     const secureUrl = await uploadToCloudinary(buffer, 'handover', filename);

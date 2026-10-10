@@ -16,7 +16,11 @@ const createNodeSchema = z.object({
   type: z.enum(['building', 'floor', 'zone', 'area', 'package']),
   name: z.string().min(1, 'Name is required').max(100),
   parentId: z.string().optional(),
-  trade: z.enum(['civil', 'interior', 'mep', 'electrical', 'hvac', 'phe', 'fire_fighting', 'elv', 'other']).optional(),
+  trade: z.enum(['civil', 'interior', 'mep', 'electrical', 'hvac', 'phe', 'fire_fighting', 'elv', 'other']).default('interior'),
+  description: z.string().optional(),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  status: z.enum(['active', 'inactive']).optional(),
 });
 
 const updateNodeSchema = z.object({
@@ -24,6 +28,10 @@ const updateNodeSchema = z.object({
   id: z.string().min(1, 'ID is required'),
   name: z.string().min(1).max(100).optional(),
   trade: z.enum(['civil', 'interior', 'mep', 'electrical', 'hvac', 'phe', 'fire_fighting', 'elv', 'other']).optional(),
+  description: z.string().optional(),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  status: z.enum(['active', 'inactive']).optional(),
 });
 
 // GET: Retrieve WBS Tree
@@ -56,6 +64,18 @@ async function getWbsHandler(req: NextRequest, context: { params: Promise<Record
       }
     }
 
+    // Helper to format node
+    const formatNode = (node: any, type: string, extra: any = {}) => ({
+      id: String(node._id),
+      name: node.name,
+      type,
+      description: node.description || '',
+      startDate: node.startDate || null,
+      endDate: node.endDate || null,
+      status: node.status || 'active',
+      ...extra,
+    });
+
     // Build hierarchical tree in-memory
     const tree = buildings.map((b: any) => {
       const bFloors = floors
@@ -72,47 +92,31 @@ async function getWbsHandler(req: NextRequest, context: { params: Promise<Record
                     .map((p: any) => {
                       const stats = taskStatsByPackage.get(String(p._id)) || { total: 0, completed: 0, progressSum: 0 };
                       const pkgProgress = stats.total > 0 ? Math.round(stats.progressSum / stats.total) : 0;
-                      return {
-                        id: String(p._id),
-                        name: p.name,
-                        type: 'package',
+                      return formatNode(p, 'package', {
                         trade: p.trade,
                         taskCount: stats.total,
                         completedTaskCount: stats.completed,
                         progress: pkgProgress,
-                      };
+                      });
                     });
 
-                  return {
-                    id: String(a._id),
-                    name: a.name,
-                    type: 'area',
-                    packages: aPackages,
-                  };
+                  return formatNode(a, 'area', { packages: aPackages });
                 });
 
-              return {
-                id: String(z._id),
-                name: z.name,
-                type: 'zone',
-                areas: zAreas,
-              };
+              return formatNode(z, 'zone', { areas: zAreas });
             });
 
-          return {
-            id: String(f._id),
-            name: f.name,
-            type: 'floor',
-            zones: fZones,
-          };
+          return formatNode(f, 'floor', { zones: fZones });
         });
 
-      return {
-        id: String(b._id),
-        name: b.name,
-        type: 'building',
+      const bStats = taskStatsByPackage.get(String(b._id)) || { total: 0, completed: 0, progressSum: 0 };
+      const bProgress = bStats.total > 0 ? Math.round(bStats.progressSum / bStats.total) : 0;
+      return formatNode(b, 'building', {
         floors: bFloors,
-      };
+        taskCount: bStats.total,
+        completedTaskCount: bStats.completed,
+        progress: bProgress,
+      });
     });
 
     // Check for packages that might not be under existing buildings/areas
@@ -134,15 +138,12 @@ async function getWbsHandler(req: NextRequest, context: { params: Promise<Record
       .map((p: any) => {
         const stats = taskStatsByPackage.get(String(p._id)) || { total: 0, completed: 0, progressSum: 0 };
         const pkgProgress = stats.total > 0 ? Math.round(stats.progressSum / stats.total) : 0;
-        return {
-          id: String(p._id),
-          name: p.name,
-          type: 'package',
+        return formatNode(p, 'package', {
           trade: p.trade,
           taskCount: stats.total,
           completedTaskCount: stats.completed,
           progress: pkgProgress,
-        };
+        });
       });
 
     if (unmappedPkgs.length > 0) {
@@ -150,21 +151,37 @@ async function getWbsHandler(req: NextRequest, context: { params: Promise<Record
         id: 'unmapped-general',
         name: 'General Packages',
         type: 'building',
+        description: 'Default package container',
+        startDate: null,
+        endDate: null,
+        status: 'active',
         floors: [
           {
             id: 'unmapped-general-floor',
             name: 'General',
             type: 'floor',
+            description: '',
+            startDate: null,
+            endDate: null,
+            status: 'active',
             zones: [
               {
                 id: 'unmapped-general-zone',
                 name: 'General',
                 type: 'zone',
+                description: '',
+                startDate: null,
+                endDate: null,
+                status: 'active',
                 areas: [
                   {
                     id: 'unmapped-general-area',
                     name: 'General Area',
                     type: 'area',
+                    description: '',
+                    startDate: null,
+                    endDate: null,
+                    status: 'active',
                     packages: unmappedPkgs,
                   }
                 ]
@@ -195,12 +212,27 @@ async function addWbsNodeHandler(req: NextRequest, context: { params: Promise<Re
       return errorResponse(validation.error.issues[0].message, 400);
     }
 
-    const { type, name, parentId, trade } = validation.data;
+    const { type, name, parentId, trade, description, startDate, endDate, status } = validation.data;
+
+    const baseData: any = {
+      organizationId,
+      projectId,
+      name,
+      description: description || '',
+      status: status || 'active',
+    };
+
+    if (startDate) baseData.startDate = new Date(startDate);
+    if (endDate) baseData.endDate = new Date(endDate);
+
+    if (baseData.startDate && baseData.endDate && baseData.startDate > baseData.endDate) {
+      return errorResponse('Start date must be before or equal to end date', 400);
+    }
 
     let createdNode;
 
     if (type === 'building') {
-      createdNode = new Building({ organizationId, projectId, name });
+      createdNode = new Building(baseData);
     } else {
       if (!parentId) {
         return errorResponse('parentId is required for nested WBS nodes', 400);
@@ -209,20 +241,20 @@ async function addWbsNodeHandler(req: NextRequest, context: { params: Promise<Re
       if (type === 'floor') {
         const parentExists = await Building.exists({ _id: parentId, projectId, organizationId });
         if (!parentExists) return errorResponse('Parent Building not found', 404);
-        createdNode = new Floor({ organizationId, projectId, buildingId: parentId, name });
+        createdNode = new Floor({ ...baseData, buildingId: parentId });
       } else if (type === 'zone') {
         const parentExists = await Floor.exists({ _id: parentId, projectId, organizationId });
         if (!parentExists) return errorResponse('Parent Floor not found', 404);
-        createdNode = new Zone({ organizationId, projectId, floorId: parentId, name });
+        createdNode = new Zone({ ...baseData, floorId: parentId });
       } else if (type === 'area') {
         const parentExists = await Zone.exists({ _id: parentId, projectId, organizationId });
         if (!parentExists) return errorResponse('Parent Zone not found', 404);
-        createdNode = new Area({ organizationId, projectId, zoneId: parentId, name });
+        createdNode = new Area({ ...baseData, zoneId: parentId });
       } else if (type === 'package') {
         const parentExists = await Area.exists({ _id: parentId, projectId, organizationId });
         if (!parentExists) return errorResponse('Parent Area not found', 404);
         if (!trade) return errorResponse('trade is required for packages', 400);
-        createdNode = new Package({ organizationId, projectId, areaId: parentId, name, trade });
+        createdNode = new Package({ ...baseData, areaId: parentId, trade });
       }
     }
 
@@ -251,10 +283,18 @@ async function updateWbsNodeHandler(req: NextRequest, context: { params: Promise
       return errorResponse(validation.error.issues[0].message, 400);
     }
 
-    const { type, id, name, trade } = validation.data;
+    const { type, id, name, trade, description, startDate, endDate, status } = validation.data;
     const updateData: any = {};
-    if (name) updateData.name = name;
+    if (name !== undefined) updateData.name = name;
     if (trade && type === 'package') updateData.trade = trade;
+    if (description !== undefined) updateData.description = description;
+    if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
+    if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
+    if (status !== undefined) updateData.status = status;
+
+    if (updateData.startDate && updateData.endDate && updateData.startDate > updateData.endDate) {
+      return errorResponse('Start date must be before or equal to end date', 400);
+    }
 
     let updatedNode;
 
@@ -273,10 +313,19 @@ async function updateWbsNodeHandler(req: NextRequest, context: { params: Promise
     }
 
     if (!updatedNode) {
-      return notFoundResponse(`${type} node not found`);
+      updatedNode =
+        (await Building.findOneAndUpdate(query, { $set: updateData }, { returnDocument: 'after' })) ||
+        (await Package.findOneAndUpdate(query, { $set: updateData }, { returnDocument: 'after' })) ||
+        (await Area.findOneAndUpdate(query, { $set: updateData }, { returnDocument: 'after' })) ||
+        (await Floor.findOneAndUpdate(query, { $set: updateData }, { returnDocument: 'after' })) ||
+        (await Zone.findOneAndUpdate(query, { $set: updateData }, { returnDocument: 'after' }));
     }
 
-    return successResponse(updatedNode, `${type} node updated successfully`);
+    if (!updatedNode) {
+      return notFoundResponse('WBS node not found');
+    }
+
+    return successResponse(updatedNode, 'WBS node updated successfully');
   } catch (error) {
     console.error('Update WBS node error:', error);
     return serverErrorResponse();
@@ -301,34 +350,24 @@ async function deleteWbsNodeHandler(req: NextRequest, context: { params: Promise
     const query = { _id: id, projectId, organizationId };
 
     if (type === 'building') {
-      const hasFloors = await Floor.exists({ buildingId: id });
-      if (hasFloors) {
-        return errorResponse('Cannot delete building: floors are still linked to it.', 400);
-      }
+      const hasFloors = await Floor.exists({ buildingId: id, projectId, organizationId });
+      if (hasFloors) return errorResponse('Cannot delete building with active floors. Remove floors first.', 400);
       await Building.deleteOne(query);
     } else if (type === 'floor') {
-      const hasZones = await Zone.exists({ floorId: id });
-      if (hasZones) {
-        return errorResponse('Cannot delete floor: zones are still linked to it.', 400);
-      }
+      const hasZones = await Zone.exists({ floorId: id, projectId, organizationId });
+      if (hasZones) return errorResponse('Cannot delete floor with active zones. Remove zones first.', 400);
       await Floor.deleteOne(query);
     } else if (type === 'zone') {
-      const hasAreas = await Area.exists({ zoneId: id });
-      if (hasAreas) {
-        return errorResponse('Cannot delete zone: areas are still linked to it.', 400);
-      }
+      const hasAreas = await Area.exists({ zoneId: id, projectId, organizationId });
+      if (hasAreas) return errorResponse('Cannot delete zone with active areas. Remove areas first.', 400);
       await Zone.deleteOne(query);
     } else if (type === 'area') {
-      const hasPackages = await Package.exists({ areaId: id });
-      if (hasPackages) {
-        return errorResponse('Cannot delete area: packages are still linked to it.', 400);
-      }
+      const hasPackages = await Package.exists({ areaId: id, projectId, organizationId });
+      if (hasPackages) return errorResponse('Cannot delete area with active packages. Remove packages first.', 400);
       await Area.deleteOne(query);
     } else if (type === 'package') {
-      const hasTasks = await Task.exists({ packageId: id, isDeleted: false });
-      if (hasTasks) {
-        return errorResponse('Cannot delete package: active tasks are still linked to it.', 400);
-      }
+      const hasTasks = await Task.exists({ packageId: id, projectId, organizationId, isDeleted: false });
+      if (hasTasks) return errorResponse('Cannot delete package with active tasks. Reassign or delete tasks first.', 400);
       await Package.deleteOne(query);
     } else {
       return errorResponse('Invalid node type', 400);

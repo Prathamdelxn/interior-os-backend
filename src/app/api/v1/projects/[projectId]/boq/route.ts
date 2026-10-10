@@ -12,17 +12,25 @@ import type { JwtPayload } from '@/lib/jwt';
 import { z } from 'zod';
 
 const boqItemSchema = z.object({
-  serialNumber: z.number().min(1),
+  serialNumber: z.number().optional(),
+  itemCode: z.string().optional(),
   category: z.string().min(1, 'Category is required'),
+  sectionNumber: z.string().optional(),
+  sectionTitle: z.string().optional(),
+  sectionScope: z.string().optional(),
   itemName: z.string().min(1, 'Item name is required'),
   description: z.string().optional(),
+  brandMakes: z.string().optional(),
   quantity: z.number().min(0, 'Quantity must be non-negative'),
   unit: z.string().min(1, 'Unit is required'),
-  rate: z.number().min(0, 'Rate must be non-negative'),
+  rate: z.number().min(0, 'Rate must be non-negative').optional(),
+  amount: z.number().optional(),
+  remarks: z.string().optional(),
 });
 
 const createBoqSchema = z.object({
   notes: z.string().optional(),
+  sections: z.array(z.any()).optional(),
   items: z.array(boqItemSchema).min(1, 'At least one item is required'),
 });
 
@@ -70,7 +78,7 @@ async function createBoqHandler(req: NextRequest, context: { params: Promise<Rec
       return errorResponse(validation.error.issues[0].message, 400);
     }
 
-    const { notes, items } = validation.data;
+    const { notes, sections, items } = validation.data;
 
     // Determine next version number
     const lastBoq = await BOQ.findOne({ projectId, organizationId })
@@ -81,7 +89,7 @@ async function createBoqHandler(req: NextRequest, context: { params: Promise<Rec
     const versionLabel = `v${nextVersion}.0`;
 
     // Calculate total amount
-    const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.rate, 0);
+    const totalAmount = items.reduce((sum, item) => sum + (item.amount !== undefined ? item.amount : item.quantity * (item.rate || 0)), 0);
 
     // Create BOQ
     const boq = new BOQ({
@@ -93,6 +101,7 @@ async function createBoqHandler(req: NextRequest, context: { params: Promise<Rec
       totalAmount,
       currency: 'INR',
       notes,
+      sections: sections || [],
       importedFrom: 'manual',
       createdBy: auth.userId,
     });
@@ -100,18 +109,24 @@ async function createBoqHandler(req: NextRequest, context: { params: Promise<Rec
     await boq.save();
 
     // Create BOQ Items
-    const boqItems = items.map((item) => ({
+    const boqItems = items.map((item, idx) => ({
       organizationId,
       projectId,
       boqId: boq._id,
-      serialNumber: item.serialNumber,
+      serialNumber: item.serialNumber || idx + 1,
+      itemCode: item.itemCode || String(item.serialNumber || idx + 1),
       category: item.category,
+      sectionNumber: item.sectionNumber || '',
+      sectionTitle: item.sectionTitle || item.category || '',
+      sectionScope: item.sectionScope || '',
       itemName: item.itemName,
       description: item.description || '',
+      brandMakes: item.brandMakes || '',
       quantity: item.quantity,
       unit: item.unit,
-      rate: item.rate,
-      amount: item.quantity * item.rate,
+      rate: item.rate || 0,
+      amount: item.amount !== undefined ? item.amount : item.quantity * (item.rate || 0),
+      remarks: item.remarks || '',
       consumedQuantity: 0,
       remainingQuantity: item.quantity,
       variancePercentage: 0,

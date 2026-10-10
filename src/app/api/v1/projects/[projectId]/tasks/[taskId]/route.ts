@@ -28,9 +28,18 @@ const completionProofImageSchema = z.object({
   uploadedAt: z.string().optional().transform((val) => val ? new Date(val) : new Date()),
 });
 
+const materialUsageInputSchema = z.object({
+  inventoryId: z.string().optional(),
+  materialName: z.string().min(1, 'Material name is required'),
+  quantity: z.number().min(0.001, 'Quantity must be greater than 0'),
+  unit: z.string().default('units'),
+  notes: z.string().optional(),
+});
+
 const completionProofInputSchema = z.object({
   images: z.array(completionProofImageSchema).default([]),
   notes: z.string().optional(),
+  materialUsage: z.array(materialUsageInputSchema).optional().default([]),
   completedAt: z.string().optional().transform((val) => val ? new Date(val) : new Date()),
   completedBy: z.string().optional(),
 });
@@ -48,6 +57,7 @@ const updateTaskSchema = z.object({
   dependencies: z.array(z.string()).optional(),
   subtasks: z.array(subtaskInputSchema).optional(),
   completionProof: completionProofInputSchema.optional(),
+  isMilestone: z.boolean().optional(),
 });
 
 // Helper: Check for circular dependencies
@@ -125,11 +135,62 @@ async function updateTaskHandler(req: NextRequest, context: { params: Promise<Re
 
     const updateData: any = { ...validation.data };
 
-    // Check package if updated
-    if (updateData.packageId) {
-      const pkgExists = await Package.exists({ _id: updateData.packageId, projectId, organizationId });
-      if (!pkgExists) {
-        return errorResponse('Target WBS package not found in this project', 404);
+    if (updateData.startDate && updateData.endDate && updateData.startDate > updateData.endDate) {
+      return errorResponse('Start date must be before or equal to end date', 400);
+    }
+
+    const existingTask = await Task.findOne({ _id: taskId, projectId, organizationId, isDeleted: false });
+    if (!existingTask) {
+      return notFoundResponse('Task not found');
+    }
+
+    const targetPackageId = updateData.packageId || existingTask.packageId;
+    if (targetPackageId) {
+      const { Area, Zone, Floor, Building, Package } = await import('@/models/wbs.model');
+      const [bldg, floor, zone, area, pkg] = await Promise.all([
+        Building.findOne({ _id: targetPackageId, projectId, organizationId }).select('name startDate endDate').lean(),
+        Floor.findOne({ _id: targetPackageId, projectId, organizationId }).select('name startDate endDate').lean(),
+        Zone.findOne({ _id: targetPackageId, projectId, organizationId }).select('name startDate endDate').lean(),
+        Area.findOne({ _id: targetPackageId, projectId, organizationId }).select('name startDate endDate').lean(),
+        Package.findOne({ _id: targetPackageId, projectId, organizationId }).select('name startDate endDate').lean(),
+      ]);
+
+      const wbsNode: any = bldg || floor || zone || area || pkg;
+      if (!wbsNode) {
+        return errorResponse('Target WBS element not found in this project', 404);
+      }
+
+      const effectiveStartDate = updateData.startDate !== undefined ? updateData.startDate : existingTask.startDate;
+      const effectiveEndDate = updateData.endDate !== undefined ? updateData.endDate : existingTask.endDate;
+
+      if (effectiveStartDate && effectiveEndDate && effectiveStartDate > effectiveEndDate) {
+        return errorResponse('Start date must be before or equal to end date', 400);
+      }
+
+      if (wbsNode.startDate && effectiveStartDate) {
+        const wbsStart = new Date(wbsNode.startDate);
+        const taskStart = new Date(effectiveStartDate);
+        wbsStart.setHours(0, 0, 0, 0);
+        taskStart.setHours(0, 0, 0, 0);
+        if (taskStart < wbsStart) {
+          return errorResponse(
+            `Activity start date cannot be earlier than WBS "${wbsNode.name}" start date (${wbsStart.toISOString().split('T')[0]})`,
+            400
+          );
+        }
+      }
+
+      if (wbsNode.endDate && effectiveEndDate) {
+        const wbsEnd = new Date(wbsNode.endDate);
+        const taskEnd = new Date(effectiveEndDate);
+        wbsEnd.setHours(23, 59, 59, 999);
+        taskEnd.setHours(23, 59, 59, 999);
+        if (taskEnd > wbsEnd) {
+          return errorResponse(
+            `Activity end date cannot be later than WBS "${wbsNode.name}" end date (${wbsEnd.toISOString().split('T')[0]})`,
+            400
+          );
+        }
       }
     }
 
@@ -189,6 +250,86 @@ async function updateTaskHandler(req: NextRequest, context: { params: Promise<Re
       return notFoundResponse('Task not found');
     }
 
+    if (updateData.isMilestone === true) {
+      try {
+        const existing = await Milestone.findOne({ projectId, organizationId, linkedTasks: task._id, isDeleted: false });
+        if (!existing) {
+          const dueDate = task.endDate || task.startDate || new Date();
+          await Milestone.create({
+            organizationId,
+            projectId,
+            name: task.name,
+            dueDate,
+            status: task.status === 'completed' ? 'achieved' : 'planned',
+            linkedTasks: [task._id],
+          });
+        } else {
+          await Milestone.updateOne(
+            { _id: existing._id },
+            {
+              $set: {
+                name: task.name,
+                dueDate: task.endDate || task.startDate || existing.dueDate,
+                status: task.status === 'completed' ? 'achieved' : existing.status,
+              }
+            }
+          );
+        }
+      } catch (mErr) {
+        console.warn('Sync milestone on task update failed:', mErr);
+      }
+    } else if (updateData.isMilestone === false) {
+      try {
+        const linkedMilestones = await Milestone.find({
+          projectId,
+          organizationId,
+          linkedTasks: task._id,
+          isDeleted: false,
+        });
+        for (const m of linkedMilestones) {
+          if (m.linkedTasks.length <= 1) {
+            await Milestone.updateOne(
+              { _id: m._id },
+              { $set: { isDeleted: true, deletedAt: new Date(), linkedTasks: [] } }
+            );
+          } else {
+            await Milestone.updateOne(
+              { _id: m._id },
+              { $pull: { linkedTasks: task._id } }
+            );
+          }
+        }
+      } catch (mErr) {
+        console.warn('Remove milestone link on task update failed:', mErr);
+      }
+    }
+
+    // If material usage was recorded, update corresponding inventory records
+    if (updateData.completionProof?.materialUsage && Array.isArray(updateData.completionProof.materialUsage)) {
+      try {
+        const { Inventory } = await import('@/models/inventory.model');
+        for (const mat of updateData.completionProof.materialUsage) {
+          if (mat.inventoryId && mat.quantity > 0) {
+            await Inventory.findOneAndUpdate(
+              { _id: mat.inventoryId, projectId, organizationId },
+              {
+                $inc: { installedQuantity: mat.quantity },
+                $push: {
+                  installHistory: {
+                    quantity: mat.quantity,
+                    date: new Date(),
+                    notes: `Used in Activity: ${task.name}${mat.notes ? ` (${mat.notes})` : ''}`,
+                  },
+                },
+              }
+            );
+          }
+        }
+      } catch (invErr) {
+        console.warn('Failed to update inventory consumption for task', invErr);
+      }
+    }
+
     return successResponse(task, 'Task updated successfully');
   } catch (error) {
     console.error('Update task error:', error);
@@ -213,17 +354,33 @@ async function deleteTaskHandler(req: NextRequest, context: { params: Promise<Re
       return notFoundResponse('Task not found');
     }
 
-    // Cleanup references in milestones and task dependencies
-    await Promise.all([
-      Milestone.updateMany(
-        { projectId, organizationId, linkedTasks: taskId },
-        { $pull: { linkedTasks: taskId } }
-      ),
-      Task.updateMany(
-        { projectId, organizationId, dependencies: taskId },
-        { $pull: { dependencies: taskId } }
-      ),
-    ]);
+    // Soft-delete milestones linked ONLY to this task, or unlink from multi-task milestones
+    const linkedMilestones = await Milestone.find({
+      projectId,
+      organizationId,
+      linkedTasks: taskId,
+      isDeleted: false,
+    });
+
+    for (const m of linkedMilestones) {
+      if (m.linkedTasks.length <= 1) {
+        await Milestone.updateOne(
+          { _id: m._id },
+          { $set: { isDeleted: true, deletedAt: new Date(), linkedTasks: [] } }
+        );
+      } else {
+        await Milestone.updateOne(
+          { _id: m._id },
+          { $pull: { linkedTasks: taskId } }
+        );
+      }
+    }
+
+    // Cleanup references in task dependencies
+    await Task.updateMany(
+      { projectId, organizationId, dependencies: taskId },
+      { $pull: { dependencies: taskId } }
+    );
 
     return successResponse(null, 'Task deleted successfully');
   } catch (error) {

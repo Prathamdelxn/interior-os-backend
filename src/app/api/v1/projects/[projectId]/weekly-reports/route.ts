@@ -51,21 +51,34 @@ async function createWeeklyReportHandler(req: NextRequest, context: { params: Pr
       const doneTasks = await Task.find({
         projectId,
         organizationId,
+        isDeleted: false,
         status: 'completed',
         updatedAt: { $gte: new Date(weekStart), $lte: new Date(weekEnd) },
+      }).populate('packageId', 'name trade').populate('assignees', 'firstName lastName name email');
+      completedActivities = doneTasks.map(t => {
+        const pkgName = (t.packageId as any)?.name ? `[${(t.packageId as any).name}] ` : '';
+        const assignees = (t.assignees as any[])?.map(a => `${a.firstName || ''} ${a.lastName || ''}`.trim() || a.name || a.email).filter(Boolean).join(', ');
+        const assigneeStr = assignees ? ` (Assigned: ${assignees})` : '';
+        return `${pkgName}${t.name} (100% Completed)${assigneeStr}`;
       });
-      completedActivities = doneTasks.map(t => t.name);
     }
 
     if (delayedActivities.length === 0) {
-      // Find delayed milestones
-      const lateMilestones = await Milestone.find({
+      // Find delayed/overdue tasks
+      const lateTasks = await Task.find({
         projectId,
         organizationId,
-        status: 'delayed',
-        dueDate: { $gte: new Date(weekStart), $lte: new Date(weekEnd) },
+        isDeleted: false,
+        status: { $ne: 'completed' },
+        endDate: { $lte: new Date(weekEnd) },
+      }).populate('packageId', 'name trade').populate('assignees', 'firstName lastName name email');
+      delayedActivities = lateTasks.map(t => {
+        const pkgName = (t.packageId as any)?.name ? `[${(t.packageId as any).name}] ` : '';
+        const assignees = (t.assignees as any[])?.map(a => `${a.firstName || ''} ${a.lastName || ''}`.trim() || a.name || a.email).filter(Boolean).join(', ');
+        const assigneeStr = assignees ? ` • Assigned: ${assignees}` : '';
+        const dueStr = t.endDate ? ` (Due: ${new Date(t.endDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })})` : '';
+        return `${pkgName}${t.name}${dueStr}${assigneeStr}`;
       });
-      delayedActivities = lateMilestones.map(m => m.name);
     }
 
     if (risks.length === 0) {
@@ -75,7 +88,7 @@ async function createWeeklyReportHandler(req: NextRequest, context: { params: Pr
         organizationId,
         status: 'open',
       });
-      risks = activeRisks.map(r => r.description);
+      risks = activeRisks.map(r => `${r.description}${r.impact ? ` (${r.impact} impact)` : ''}`);
     }
 
     if (nextWeekPlan.length === 0) {
@@ -83,9 +96,16 @@ async function createWeeklyReportHandler(req: NextRequest, context: { params: Pr
       const upcomingTasks = await Task.find({
         projectId,
         organizationId,
+        isDeleted: false,
         status: { $in: ['todo', 'in_progress'] },
-      }).limit(5);
-      nextWeekPlan = upcomingTasks.map(t => t.name);
+      }).populate('packageId', 'name trade').populate('assignees', 'firstName lastName name email').limit(10);
+      nextWeekPlan = upcomingTasks.map(t => {
+        const pkgName = (t.packageId as any)?.name ? `[${(t.packageId as any).name}] ` : '';
+        const assignees = (t.assignees as any[])?.map(a => `${a.firstName || ''} ${a.lastName || ''}`.trim() || a.name || a.email).filter(Boolean).join(', ');
+        const assigneeStr = assignees ? ` • Assigned: ${assignees}` : '';
+        const progStr = t.progress ? ` (${t.progress}% ongoing)` : ' (Scheduled)';
+        return `Execute ${pkgName}${t.name}${progStr}${assigneeStr}`;
+      });
     }
 
     const report = new WeeklyReport({

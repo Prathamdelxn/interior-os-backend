@@ -4,6 +4,31 @@
 
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
+export interface IDrawingAttachment {
+  name: string;
+  url: string;
+  type: 'image' | 'video' | 'audio' | 'file';
+  size?: number;
+}
+
+export interface IDrawingAnnotation {
+  id: string;
+  pinNumber?: number;
+  versionNumber?: number;
+  x: number;
+  y: number;
+  text: string;
+  type?: 'comment' | 'issue' | 'snag' | 'revision' | 'approved';
+  attachments?: IDrawingAttachment[];
+  author?: {
+    name: string;
+    email?: string;
+    avatar?: string;
+  };
+  resolved?: boolean;
+  createdAt: Date;
+}
+
 export interface IDrawingRevision {
   revision: string;
   url: string;
@@ -23,6 +48,7 @@ export interface IDrawing extends Document {
   fileType?: string;
   status: 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected';
   revisions: IDrawingRevision[];
+  annotations?: IDrawingAnnotation[];
   isDeleted: boolean;
   deletedAt?: Date;
   createdAt: Date;
@@ -62,6 +88,33 @@ const DrawingSchema = new Schema<IDrawing>(
         createdAt: { type: Date, default: Date.now },
       },
     ],
+    annotations: [
+      {
+        id: { type: String },
+        pinNumber: { type: Number },
+        versionNumber: { type: Number },
+        x: { type: Number, required: true },
+        y: { type: Number, required: true },
+        text: { type: String, default: '' },
+        type: { type: String, default: 'comment' },
+        attachments: [
+          {
+            name: { type: String },
+            url: { type: String },
+            type: { type: String, enum: ['image', 'video', 'audio', 'file'], default: 'image' },
+            size: { type: Number },
+          },
+        ],
+        author: {
+          name: { type: String },
+          email: { type: String },
+          avatar: { type: String },
+        },
+        resolved: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now },
+      },
+      { _id: false }
+    ],
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: Date,
   },
@@ -85,6 +138,10 @@ DrawingSchema.pre('findOne', function () {
     this.where({ isDeleted: false });
   }
 });
+
+if (mongoose.models.Drawing) {
+  delete (mongoose.models as any).Drawing;
+}
 
 export const Drawing: Model<IDrawing> = mongoose.models.Drawing || mongoose.model<IDrawing>('Drawing', DrawingSchema);
 export default Drawing;

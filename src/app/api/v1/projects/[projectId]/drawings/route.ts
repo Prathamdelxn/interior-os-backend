@@ -81,12 +81,26 @@ async function updateDrawingHandler(req: NextRequest, context: { params: Promise
     const { projectId } = await context.params;
     const body = await req.json();
 
-    const { drawingId, status, fileUrl, url, changes, revisionName, revision, title, discipline, drawingType, fileType } = body;
+    const { drawingId, status, fileUrl, url, changes, revisionName, revision, title, discipline, drawingType, fileType, annotations } = body;
     if (!drawingId) {
       return errorResponse('drawingId is required', 400);
     }
 
-    const drawing = await Drawing.findOne({ _id: drawingId, projectId, organizationId });
+    const query: any = {};
+    if (organizationId) query.organizationId = organizationId;
+    if (projectId) query.projectId = projectId;
+
+    if (mongoose.Types.ObjectId.isValid(drawingId)) {
+      query.$or = [{ _id: new mongoose.Types.ObjectId(drawingId) }, { drawingNumber: drawingId }];
+    } else {
+      query.$or = [{ drawingNumber: drawingId }, { title: drawingId }];
+    }
+
+    let drawing = await Drawing.findOne(query);
+    if (!drawing && mongoose.Types.ObjectId.isValid(drawingId)) {
+      drawing = await Drawing.findById(drawingId);
+    }
+
     if (!drawing) {
       return notFoundResponse('Drawing not found');
     }
@@ -94,31 +108,34 @@ async function updateDrawingHandler(req: NextRequest, context: { params: Promise
     const effectiveFileUrl = fileUrl || url;
     const effectiveRevName = revisionName || revision;
 
+    const updatePayload: any = {};
+    if (title) updatePayload.title = title;
+    if (discipline) updatePayload.discipline = discipline;
+    if (drawingType) updatePayload.drawingType = drawingType;
+    if (fileType) updatePayload.fileType = fileType;
+    if (status) updatePayload.status = status;
+    if (annotations !== undefined) updatePayload.annotations = annotations;
+
     // If uploading a new revision
     if (effectiveFileUrl && effectiveRevName) {
-      drawing.revisions.push({
+      const newRev = {
         revision: effectiveRevName,
         url: effectiveFileUrl,
         uploadedBy: new mongoose.Types.ObjectId(auth.userId),
         changes: changes || '',
         createdAt: new Date(),
-      });
-      drawing.status = 'submitted';
+      };
+      updatePayload.$push = { revisions: newRev };
+      updatePayload.status = 'submitted';
     }
 
-    // If updating metadata
-    if (title) drawing.title = title;
-    if (discipline) drawing.discipline = discipline;
-    if (drawingType) drawing.drawingType = drawingType;
-    if (fileType) drawing.fileType = fileType;
+    const updatedDrawing = await Drawing.findByIdAndUpdate(
+      drawing._id,
+      updatePayload.$push ? { $set: updatePayload, $push: updatePayload.$push } : { $set: updatePayload },
+      { new: true, runValidators: false }
+    );
 
-    // If updating approval status
-    if (status) {
-      drawing.status = status;
-    }
-
-    await drawing.save();
-    return successResponse(drawing, 'Drawing updated successfully');
+    return successResponse(updatedDrawing || drawing, 'Drawing updated successfully');
   } catch (error) {
     console.error('Update drawing error:', error);
     return serverErrorResponse();
@@ -138,8 +155,15 @@ async function deleteDrawingHandler(req: NextRequest, context: { params: Promise
       return errorResponse('drawingId query parameter is required', 400);
     }
 
+    const query: any = { projectId, organizationId };
+    if (mongoose.Types.ObjectId.isValid(drawingId)) {
+      query.$or = [{ _id: new mongoose.Types.ObjectId(drawingId) }, { drawingNumber: drawingId }];
+    } else {
+      query.$or = [{ drawingNumber: drawingId }, { title: drawingId }];
+    }
+
     const drawing = await Drawing.findOneAndUpdate(
-      { _id: drawingId, projectId, organizationId },
+      query,
       { isDeleted: true, deletedAt: new Date() },
       { returnDocument: 'after' }
     );

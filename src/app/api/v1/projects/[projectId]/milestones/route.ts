@@ -26,58 +26,76 @@ async function getMilestonesHandler(req: NextRequest, context: { params: Promise
     const organizationId = getOrganizationId(auth);
     const { projectId } = await context.params;
 
+    // Fetch active tasks for this project to check against
+    const activeTasksList = await Task.find({ projectId, organizationId, isDeleted: false })
+      .select('_id name status progress isMilestone')
+      .lean();
+    const activeTaskIdSet = new Set(activeTasksList.map((t: any) => String(t._id)));
+
     const milestones = await Milestone.find({ projectId, organizationId, isDeleted: false })
-      .populate('linkedTasks', 'name status progress')
+      .populate('linkedTasks', 'name status progress isDeleted')
       .sort({ dueDate: 1 });
 
     // For each milestone, query its delays and sync status if linked tasks exist
-    const enrichedMilestones = await Promise.all(
-      milestones.map(async (milestone) => {
-        // Safely filter out any soft-deleted or null populated tasks
-        const activeTasks = (milestone.linkedTasks || []).filter(Boolean) as any[];
+    const enrichedMilestones: any[] = [];
 
-        let computedStatus = milestone.status;
-        if (activeTasks.length > 0) {
-          const allCompleted = activeTasks.every((t: any) => t.status === 'completed');
-          if (allCompleted) {
-            computedStatus = 'achieved';
-          } else {
-            const now = new Date();
-            now.setHours(0, 0, 0, 0);
-            const due = new Date(milestone.dueDate);
-            due.setHours(0, 0, 0, 0);
-            computedStatus = due < now ? 'delayed' : 'planned';
-          }
+    for (const milestone of milestones) {
+      // Safely filter out any soft-deleted, null, or non-existent populated tasks
+      const activeTasks = ((milestone.linkedTasks || []) as any[]).filter(
+        (t: any) => t && !t.isDeleted && activeTaskIdSet.has(String(t._id || t))
+      );
+
+      // If this milestone was linked to tasks, but all of them are now deleted or removed,
+      // soft-delete this orphaned milestone
+      if (milestone.linkedTasks && milestone.linkedTasks.length > 0 && activeTasks.length === 0) {
+        await Milestone.updateOne(
+          { _id: milestone._id },
+          { $set: { isDeleted: true, deletedAt: new Date(), linkedTasks: [] } }
+        );
+        continue;
+      }
+
+      let computedStatus = milestone.status;
+      if (activeTasks.length > 0) {
+        const allCompleted = activeTasks.every((t: any) => t.status === 'completed');
+        if (allCompleted) {
+          computedStatus = 'achieved';
         } else {
-          if (milestone.status !== 'achieved') {
-            const now = new Date();
-            now.setHours(0, 0, 0, 0);
-            const due = new Date(milestone.dueDate);
-            due.setHours(0, 0, 0, 0);
-            computedStatus = due < now ? 'delayed' : 'planned';
-          }
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          const due = new Date(milestone.dueDate);
+          due.setHours(0, 0, 0, 0);
+          computedStatus = due < now ? 'delayed' : 'planned';
         }
-
-        if (computedStatus !== milestone.status) {
-          await Milestone.updateOne({ _id: milestone._id }, { $set: { status: computedStatus } });
+      } else {
+        if (milestone.status !== 'achieved') {
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          const due = new Date(milestone.dueDate);
+          due.setHours(0, 0, 0, 0);
+          computedStatus = due < now ? 'delayed' : 'planned';
         }
+      }
 
-        const delays = await MilestoneDelay.find({ milestoneId: milestone._id, projectId, organizationId })
-          .populate('approvedBy', 'firstName lastName')
-          .sort({ createdAt: -1 });
+      if (computedStatus !== milestone.status) {
+        await Milestone.updateOne({ _id: milestone._id }, { $set: { status: computedStatus } });
+      }
 
-        const completedCount = activeTasks.filter((t: any) => t.status === 'completed').length;
-        const progress = activeTasks.length > 0 ? Math.round((completedCount / activeTasks.length) * 100) : (computedStatus === 'achieved' ? 100 : 0);
+      const delays = await MilestoneDelay.find({ milestoneId: milestone._id, projectId, organizationId })
+        .populate('approvedBy', 'firstName lastName')
+        .sort({ createdAt: -1 });
 
-        return {
-          ...milestone.toJSON(),
-          linkedTasks: activeTasks,
-          status: computedStatus,
-          progress,
-          delays,
-        };
-      })
-    );
+      const completedCount = activeTasks.filter((t: any) => t.status === 'completed').length;
+      const progress = activeTasks.length > 0 ? Math.round((completedCount / activeTasks.length) * 100) : (computedStatus === 'achieved' ? 100 : 0);
+
+      enrichedMilestones.push({
+        ...milestone.toJSON(),
+        linkedTasks: activeTasks,
+        status: computedStatus,
+        progress,
+        delays,
+      });
+    }
 
     return successResponse(enrichedMilestones);
   } catch (error) {

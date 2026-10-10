@@ -13,17 +13,25 @@ import { z } from 'zod';
 
 const updateBoqItemSchema = z.object({
   _id: z.string().optional(),
-  serialNumber: z.number().min(1),
+  serialNumber: z.number().optional(),
+  itemCode: z.string().optional(),
   category: z.string().min(1),
+  sectionNumber: z.string().optional(),
+  sectionTitle: z.string().optional(),
+  sectionScope: z.string().optional(),
   itemName: z.string().min(1),
   description: z.string().optional(),
+  brandMakes: z.string().optional(),
   quantity: z.number().min(0),
   unit: z.string().min(1),
-  rate: z.number().min(0),
+  rate: z.number().min(0).optional(),
+  amount: z.number().optional(),
+  remarks: z.string().optional(),
 });
 
 const updateBoqSchema = z.object({
   notes: z.string().optional(),
+  sections: z.array(z.any()).optional(),
   items: z.array(updateBoqItemSchema).optional(),
 });
 
@@ -75,10 +83,14 @@ async function updateBoqHandler(req: NextRequest, context: { params: Promise<Rec
       return errorResponse('Only draft or rejected BOQs can be edited', 400);
     }
 
-    const { notes, items } = validation.data;
+    const { notes, sections, items } = validation.data;
 
     if (notes !== undefined) {
       boq.notes = notes;
+    }
+
+    if (sections !== undefined) {
+      boq.sections = sections;
     }
 
     if (items && items.length > 0) {
@@ -88,18 +100,24 @@ async function updateBoqHandler(req: NextRequest, context: { params: Promise<Rec
         { $set: { isDeleted: true, deletedAt: new Date() } }
       );
 
-      const newItems = items.map((item) => ({
+      const newItems = items.map((item, idx) => ({
         organizationId,
         projectId,
         boqId: boq._id,
-        serialNumber: item.serialNumber,
+        serialNumber: item.serialNumber || idx + 1,
+        itemCode: item.itemCode || String(item.serialNumber || idx + 1),
         category: item.category,
+        sectionNumber: item.sectionNumber || '',
+        sectionTitle: item.sectionTitle || item.category || '',
+        sectionScope: item.sectionScope || '',
         itemName: item.itemName,
         description: item.description || '',
+        brandMakes: item.brandMakes || '',
         quantity: item.quantity,
         unit: item.unit,
-        rate: item.rate,
-        amount: item.quantity * item.rate,
+        rate: item.rate || 0,
+        amount: item.amount !== undefined ? item.amount : item.quantity * (item.rate || 0),
+        remarks: item.remarks || '',
         consumedQuantity: 0,
         remainingQuantity: item.quantity,
         variancePercentage: 0,

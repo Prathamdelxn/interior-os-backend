@@ -30,9 +30,37 @@ async function getMembersHandler(req: NextRequest, context: { params: Promise<Re
       .populate({
         path: 'userId',
         select: 'firstName lastName email designation avatar department systemRole',
-      });
+      })
+      .lean();
 
-    return successResponse(members);
+    // Also include organization admins/super admins so they can be assigned to activities
+    const existingUserIds = new Set(
+      members
+        .map((m: any) => m.userId?._id ? String(m.userId._id) : String(m.userId))
+        .filter(Boolean)
+    );
+
+    const adminUsers = await User.find({
+      organizationId,
+      systemRole: { $in: ['super_admin', 'org_admin'] },
+      isDeleted: false,
+    }).select('firstName lastName email designation avatar department systemRole').lean();
+
+    const formattedMembers: any[] = [...members];
+    for (const admin of adminUsers) {
+      if (!existingUserIds.has(String(admin._id))) {
+        formattedMembers.push({
+          _id: `admin-${admin._id}`,
+          projectId,
+          userId: admin,
+          projectRole: admin.systemRole === 'super_admin' ? 'project_manager' : 'project_manager',
+          roleTitle: admin.systemRole === 'super_admin' ? 'Super Admin' : 'Admin',
+          isOrgAdmin: true,
+        });
+      }
+    }
+
+    return successResponse(formattedMembers);
   } catch (error) {
     console.error('List project members error:', error);
     return serverErrorResponse();

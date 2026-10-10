@@ -10,6 +10,10 @@ export interface IBuilding extends Document {
   organizationId: mongoose.Types.ObjectId;
   projectId: mongoose.Types.ObjectId;
   name: string;
+  description?: string;
+  startDate?: Date;
+  endDate?: Date;
+  status?: 'active' | 'inactive';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +23,10 @@ const BuildingSchema = new Schema<IBuilding>(
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     name: { type: String, required: true, trim: true },
+    description: { type: String, trim: true, default: '' },
+    startDate: { type: Date },
+    endDate: { type: Date },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   },
   { timestamps: true }
 );
@@ -30,6 +38,10 @@ export interface IFloor extends Document {
   projectId: mongoose.Types.ObjectId;
   buildingId: mongoose.Types.ObjectId;
   name: string;
+  description?: string;
+  startDate?: Date;
+  endDate?: Date;
+  status?: 'active' | 'inactive';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +52,10 @@ const FloorSchema = new Schema<IFloor>(
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     buildingId: { type: Schema.Types.ObjectId, ref: 'Building', required: true, index: true },
     name: { type: String, required: true, trim: true },
+    description: { type: String, trim: true, default: '' },
+    startDate: { type: Date },
+    endDate: { type: Date },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   },
   { timestamps: true }
 );
@@ -51,6 +67,10 @@ export interface IZone extends Document {
   projectId: mongoose.Types.ObjectId;
   floorId: mongoose.Types.ObjectId;
   name: string;
+  description?: string;
+  startDate?: Date;
+  endDate?: Date;
+  status?: 'active' | 'inactive';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,6 +81,10 @@ const ZoneSchema = new Schema<IZone>(
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     floorId: { type: Schema.Types.ObjectId, ref: 'Floor', required: true, index: true },
     name: { type: String, required: true, trim: true },
+    description: { type: String, trim: true, default: '' },
+    startDate: { type: Date },
+    endDate: { type: Date },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   },
   { timestamps: true }
 );
@@ -72,6 +96,10 @@ export interface IArea extends Document {
   projectId: mongoose.Types.ObjectId;
   zoneId: mongoose.Types.ObjectId;
   name: string;
+  description?: string;
+  startDate?: Date;
+  endDate?: Date;
+  status?: 'active' | 'inactive';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,6 +110,10 @@ const AreaSchema = new Schema<IArea>(
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     zoneId: { type: Schema.Types.ObjectId, ref: 'Zone', required: true, index: true },
     name: { type: String, required: true, trim: true },
+    description: { type: String, trim: true, default: '' },
+    startDate: { type: Date },
+    endDate: { type: Date },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   },
   { timestamps: true }
 );
@@ -94,6 +126,10 @@ export interface IPackage extends Document {
   areaId: mongoose.Types.ObjectId;
   name: string;
   trade: 'civil' | 'interior' | 'mep' | 'electrical' | 'hvac' | 'phe' | 'fire_fighting' | 'elv' | 'other';
+  description?: string;
+  startDate?: Date;
+  endDate?: Date;
+  status?: 'active' | 'inactive';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -109,9 +145,20 @@ const PackageSchema = new Schema<IPackage>(
       enum: ['civil', 'interior', 'mep', 'electrical', 'hvac', 'phe', 'fire_fighting', 'elv', 'other'],
       default: 'interior',
     },
+    description: { type: String, trim: true, default: '' },
+    startDate: { type: Date },
+    endDate: { type: Date },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   },
   { timestamps: true }
 );
+
+// Ensure fresh schema models on dev hot reload
+delete (mongoose.models as any).Building;
+delete (mongoose.models as any).Floor;
+delete (mongoose.models as any).Zone;
+delete (mongoose.models as any).Area;
+delete (mongoose.models as any).Package;
 
 // Exports
 export const Building: Model<IBuilding> = mongoose.models.Building || mongoose.model<IBuilding>('Building', BuildingSchema);

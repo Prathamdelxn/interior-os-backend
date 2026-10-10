@@ -16,6 +16,7 @@ export interface IBOQ extends Document {
   totalAmount: number;
   currency: string;
   notes?: string;
+  sections?: any[];
 
   // Approval workflow
   submittedBy?: mongoose.Types.ObjectId;
@@ -55,6 +56,7 @@ const BOQSchema = new Schema<IBOQ>(
     totalAmount: { type: Number, default: 0, min: 0 },
     currency: { type: String, default: 'INR' },
     notes: { type: String, trim: true },
+    sections: { type: [Schema.Types.Mixed], default: [] },
 
     // Approval workflow
     submittedBy: { type: Schema.Types.ObjectId, ref: 'User' },

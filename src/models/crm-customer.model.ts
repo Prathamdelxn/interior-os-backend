@@ -102,6 +102,7 @@ export interface IQuotationItem {
 
 export interface IQuotation {
   version?: number;
+  quotationNumber?: string;
   title?: string;
   sourceBoqVersion?: number;
   scopeMode?: string;
@@ -116,6 +117,12 @@ export interface IQuotation {
   createdAt: Date;
   updatedAt?: Date;
   notes?: string;
+  vendorQuotes?: any[];
+  attachments?: any[];
+  dispatches?: any[];
+  sentToClient?: any;
+  sentVendors?: any[];
+  [key: string]: any;
 }
 
 export interface IBoqAttachment {

@@ -86,9 +86,18 @@ export interface ICompletionProofImage {
   uploadedAt?: Date;
 }
 
+export interface IMaterialUsage {
+  inventoryId?: mongoose.Types.ObjectId;
+  materialName: string;
+  quantity: number;
+  unit: string;
+  notes?: string;
+}
+
 export interface ICompletionProof {
   images: ICompletionProofImage[];
   notes?: string;
+  materialUsage?: IMaterialUsage[];
   completedAt?: Date;
   completedBy?: mongoose.Types.ObjectId;
 }
@@ -109,6 +118,7 @@ export interface ITask extends Document {
   dependencies: mongoose.Types.ObjectId[];
   subtasks: ISubtask[];
   completionProof?: ICompletionProof;
+  isMilestone?: boolean;
   isDeleted: boolean;
   deletedAt?: Date;
   createdAt: Date;
@@ -135,10 +145,22 @@ const CompletionProofImageSchema = new Schema<ICompletionProofImage>(
   { _id: false }
 );
 
+const MaterialUsageSchema = new Schema<IMaterialUsage>(
+  {
+    inventoryId: { type: Schema.Types.ObjectId, ref: 'Inventory' },
+    materialName: { type: String, required: true, trim: true },
+    quantity: { type: Number, required: true, min: 0 },
+    unit: { type: String, default: 'units', trim: true },
+    notes: { type: String, trim: true },
+  },
+  { _id: false }
+);
+
 const CompletionProofSchema = new Schema<ICompletionProof>(
   {
     images: { type: [CompletionProofImageSchema], default: [] },
     notes: { type: String, trim: true },
+    materialUsage: { type: [MaterialUsageSchema], default: [] },
     completedAt: { type: Date, default: Date.now },
     completedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
@@ -149,7 +171,7 @@ const TaskSchema = new Schema<ITask>(
   {
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
-    packageId: { type: Schema.Types.ObjectId, ref: 'Package', required: true, index: true },
+    packageId: { type: Schema.Types.ObjectId, required: true, index: true },
     name: { type: String, required: true, trim: true },
     description: String,
     status: {
@@ -171,6 +193,7 @@ const TaskSchema = new Schema<ITask>(
     dependencies: [{ type: Schema.Types.ObjectId, ref: 'Task' }],
     subtasks: { type: [SubtaskSchema], default: [] },
     completionProof: { type: CompletionProofSchema, default: null },
+    isMilestone: { type: Boolean, default: false, index: true },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: Date,
   },

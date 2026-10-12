@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { SitePhoto } from '@/models/site-photo.model';
-import { successResponse, createdResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
+import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 
 // GET: Retrieve all site photos for the project
@@ -53,5 +53,31 @@ async function createPhotoHandler(req: NextRequest, context: { params: Promise<R
   }
 }
 
+// DELETE: Delete a site photo log
+async function deletePhotoHandler(req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) {
+  try {
+    await connectDB();
+    const organizationId = getOrganizationId(auth);
+    const { projectId } = await context.params;
+    const { searchParams } = new URL(req.url);
+    const photoId = searchParams.get('photoId');
+
+    if (!photoId) {
+      return errorResponse('photoId is required', 400);
+    }
+
+    const photo = await SitePhoto.findOneAndDelete({ _id: photoId, projectId, organizationId });
+    if (!photo) {
+      return notFoundResponse('Site photo not found');
+    }
+
+    return successResponse(null, 'Site photo deleted successfully');
+  } catch (error) {
+    console.error('Delete photo error:', error);
+    return serverErrorResponse();
+  }
+}
+
 export const GET = withAuth(getPhotosHandler);
 export const POST = withAuth(createPhotoHandler);
+export const DELETE = withAuth(deletePhotoHandler);

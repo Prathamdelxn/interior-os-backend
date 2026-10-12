@@ -19,6 +19,7 @@ export interface IDrawingAnnotation {
   y: number;
   text: string;
   type?: 'comment' | 'issue' | 'snag' | 'revision' | 'approved';
+  snagId?: string;
   attachments?: IDrawingAttachment[];
   author?: {
     name: string;
@@ -97,6 +98,7 @@ const DrawingSchema = new Schema<IDrawing>(
         y: { type: Number, required: true },
         text: { type: String, default: '' },
         type: { type: String, default: 'comment' },
+        snagId: { type: String },
         attachments: [
           {
             name: { type: String },

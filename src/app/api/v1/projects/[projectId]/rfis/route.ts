@@ -98,3 +98,30 @@ async function updateRfiHandler(req: NextRequest, context: { params: Promise<Rec
 export const GET = withAuth(getRfisHandler);
 export const POST = withAuth(createRfiHandler);
 export const PUT = withAuth(updateRfiHandler);
+
+// DELETE: Delete an RFI
+async function deleteRfiHandler(req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) {
+  try {
+    await connectDB();
+    const organizationId = getOrganizationId(auth);
+    const { projectId } = await context.params;
+    const { searchParams } = new URL(req.url);
+    const rfiId = searchParams.get('rfiId');
+
+    if (!rfiId) {
+      return errorResponse('rfiId is required', 400);
+    }
+
+    const rfi = await RFI.findOneAndDelete({ _id: rfiId, projectId, organizationId });
+    if (!rfi) {
+      return notFoundResponse('RFI not found');
+    }
+
+    return successResponse(null, 'RFI deleted successfully');
+  } catch (error) {
+    console.error('Delete RFI error:', error);
+    return serverErrorResponse();
+  }
+}
+
+export const DELETE = withAuth(deleteRfiHandler);

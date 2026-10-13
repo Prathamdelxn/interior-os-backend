@@ -85,8 +85,22 @@ async function createVariationOrderHandler(
     }
 
     // Generate sequential VO number
-    const count = await VariationOrder.countDocuments({ projectId, organizationId });
-    const voNumber = `VO-${String(count + 1).padStart(5, '0')}`;
+    const latestVo = await VariationOrder.findOne({ projectId, organizationId, isDeleted: { $in: [true, false] } })
+      .sort({ createdAt: -1 })
+      .select('voNumber')
+      .lean();
+    let nextNum = 1;
+    if (latestVo?.voNumber) {
+      const match = latestVo.voNumber.match(/(\d+)$/);
+      if (match) nextNum = parseInt(match[1], 10) + 1;
+    }
+    let voNumber = `VO-${String(nextNum).padStart(5, '0')}`;
+    let exists = await VariationOrder.findOne({ projectId, organizationId, voNumber, isDeleted: { $in: [true, false] } });
+    while (exists) {
+      nextNum++;
+      voNumber = `VO-${String(nextNum).padStart(5, '0')}`;
+      exists = await VariationOrder.findOne({ projectId, organizationId, voNumber, isDeleted: { $in: [true, false] } });
+    }
 
     const newVo = new VariationOrder({
       voNumber,

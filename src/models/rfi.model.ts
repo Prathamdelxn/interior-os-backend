@@ -16,6 +16,9 @@ export interface IRFI extends Document {
   dueDate: Date;
   status: 'open' | 'responded' | 'closed';
   priority: 'low' | 'medium' | 'high' | 'critical';
+  response?: string;
+  respondedBy?: mongoose.Types.ObjectId;
+  respondedAt?: Date;
   attachments: string[];
   isDeleted: boolean;
   deletedAt?: Date;
@@ -45,6 +48,9 @@ const RFISchema = new Schema<IRFI>(
       default: 'medium',
       index: true,
     },
+    response: { type: String, trim: true },
+    respondedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    respondedAt: { type: Date },
     attachments: [{ type: String }],
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: Date,

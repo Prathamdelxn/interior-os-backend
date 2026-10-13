@@ -117,8 +117,7 @@ async function updateUserHandler(req: NextRequest, context: { params: Promise<Re
     if (status) user.status = status;
 
     if (password && password.trim().length >= 8) {
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(password.trim(), salt);
+      user.password = password.trim();
     }
 
     await user.save();

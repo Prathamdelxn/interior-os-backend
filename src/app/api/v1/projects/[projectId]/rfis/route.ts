@@ -37,8 +37,23 @@ async function createRfiHandler(req: NextRequest, context: { params: Promise<Rec
       return errorResponse('subject and question are required', 400);
     }
 
-    const count = await RFI.countDocuments({ organizationId });
-    const rfiNumber = `RFI-2026-${String(count + 1).padStart(3, '0')}`;
+    const currentYear = new Date().getFullYear();
+    const latestRfi = await RFI.findOne({ organizationId, isDeleted: { $in: [true, false] } })
+      .sort({ createdAt: -1 })
+      .select('rfiNumber')
+      .lean();
+    let nextNum = 1;
+    if (latestRfi?.rfiNumber) {
+      const match = latestRfi.rfiNumber.match(/(\d+)$/);
+      if (match) nextNum = parseInt(match[1], 10) + 1;
+    }
+    let rfiNumber = `RFI-${currentYear}-${String(nextNum).padStart(3, '0')}`;
+    let exists = await RFI.findOne({ organizationId, projectId, rfiNumber, isDeleted: { $in: [true, false] } });
+    while (exists) {
+      nextNum++;
+      rfiNumber = `RFI-${currentYear}-${String(nextNum).padStart(3, '0')}`;
+      exists = await RFI.findOne({ organizationId, projectId, rfiNumber, isDeleted: { $in: [true, false] } });
+    }
 
     const newRfi = new RFI({
       ...body,
@@ -83,7 +98,9 @@ async function updateRfiHandler(req: NextRequest, context: { params: Promise<Rec
     }
     
     if (response) {
-      rfi.question = rfi.question + `\n\n[RESPONSE]: ${response}`;
+      rfi.response = response;
+      rfi.respondedBy = auth.userId as any;
+      rfi.respondedAt = new Date();
       rfi.status = 'responded';
     }
 

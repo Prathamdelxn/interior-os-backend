@@ -11,7 +11,7 @@ import type { NextRequest } from 'next/server';
 
 export interface LogAuditOptions {
   organizationId: string | mongoose.Types.ObjectId;
-  userId: string | mongoose.Types.ObjectId;
+  userId?: string | mongoose.Types.ObjectId;
   action: 'create' | 'update' | 'delete' | 'approve' | 'reject' | 'login' | 'logout' | 'export' | 'upload' | 'download';
   entity: string;
   entityId?: string | mongoose.Types.ObjectId;
@@ -43,17 +43,33 @@ export async function logAuditEvent(options: LogAuditOptions): Promise<void> {
       userAgent = options.req.headers.get('user-agent') || undefined;
     }
 
-    const orgId = typeof options.organizationId === 'string'
+    const orgId = typeof options.organizationId === 'string' && mongoose.Types.ObjectId.isValid(options.organizationId)
       ? new mongoose.Types.ObjectId(options.organizationId)
-      : options.organizationId;
+      : (options.organizationId as any);
 
-    const uId = typeof options.userId === 'string'
-      ? new mongoose.Types.ObjectId(options.userId)
-      : options.userId;
+    const uId = options.userId
+      ? (typeof options.userId === 'string' && mongoose.Types.ObjectId.isValid(options.userId)
+          ? new mongoose.Types.ObjectId(options.userId)
+          : (options.userId as any))
+      : undefined;
 
-    const eId = options.entityId
-      ? (typeof options.entityId === 'string' ? new mongoose.Types.ObjectId(options.entityId) : options.entityId)
-      : new mongoose.Types.ObjectId();
+    let eId: mongoose.Types.ObjectId;
+    let metadata = options.metadata;
+
+    if (options.entityId) {
+      if (typeof options.entityId === 'string') {
+        if (mongoose.Types.ObjectId.isValid(options.entityId)) {
+          eId = new mongoose.Types.ObjectId(options.entityId);
+        } else {
+          eId = new mongoose.Types.ObjectId();
+          metadata = { ...(metadata || {}), originalEntityId: options.entityId };
+        }
+      } else {
+        eId = options.entityId;
+      }
+    } else {
+      eId = new mongoose.Types.ObjectId();
+    }
 
     await AuditLog.create({
       organizationId: orgId,
@@ -135,13 +151,30 @@ export async function getAuditLogs(params: GetAuditLogsParams) {
 
   if (params.search && params.search.trim()) {
     const searchRegex = { $regex: params.search.trim(), $options: 'i' };
-    query.$or = [
+    const matchingUsers = await User.find({
+      organizationId: { $in: [orgId, String(orgId)] },
+      $or: [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { email: searchRegex },
+      ],
+    })
+      .select('_id')
+      .lean();
+
+    const orConditions: any[] = [
       { entity: searchRegex },
       { entityName: searchRegex },
       { description: searchRegex },
       { ipAddress: searchRegex },
       { action: searchRegex },
     ];
+
+    if (matchingUsers.length > 0) {
+      orConditions.push({ userId: { $in: matchingUsers.map((u) => u._id) } });
+    }
+
+    query.$or = orConditions;
   }
 
   const [total, logs] = await Promise.all([

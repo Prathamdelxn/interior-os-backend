@@ -18,10 +18,12 @@ async function getCustomerStatsHandler(
   try {
     await connectDB();
     const organizationId = getOrganizationId(auth);
-    const orgObjectId = new mongoose.Types.ObjectId(organizationId);
+    const orgMatchFilter = mongoose.Types.ObjectId.isValid(organizationId)
+      ? { $in: [organizationId, new mongoose.Types.ObjectId(organizationId)] }
+      : organizationId;
 
     const [stats] = await CrmCustomer.aggregate([
-      { $match: { organizationId: orgObjectId } },
+      { $match: { organizationId: orgMatchFilter } },
       {
         $facet: {
           total: [{ $count: 'count' }],

@@ -64,8 +64,23 @@ async function createPurchaseOrderHandler(req: NextRequest, context: { params: P
       }];
     }
 
-    const count = await PurchaseOrder.countDocuments({ organizationId });
-    const poNumber = `PO-2026-${String(count + 1).padStart(3, '0')}`;
+    const currentYear = new Date().getFullYear();
+    const latestPo = await PurchaseOrder.findOne({ organizationId, isDeleted: { $in: [true, false] } })
+      .sort({ createdAt: -1 })
+      .select('poNumber')
+      .lean();
+    let nextNum = 1;
+    if (latestPo?.poNumber) {
+      const match = latestPo.poNumber.match(/(\d+)$/);
+      if (match) nextNum = parseInt(match[1], 10) + 1;
+    }
+    let poNumber = `PO-${currentYear}-${String(nextNum).padStart(3, '0')}`;
+    let exists = await PurchaseOrder.findOne({ organizationId, poNumber, isDeleted: { $in: [true, false] } });
+    while (exists) {
+      nextNum++;
+      poNumber = `PO-${currentYear}-${String(nextNum).padStart(3, '0')}`;
+      exists = await PurchaseOrder.findOne({ organizationId, poNumber, isDeleted: { $in: [true, false] } });
+    }
 
     const po = new PurchaseOrder({
       poNumber,

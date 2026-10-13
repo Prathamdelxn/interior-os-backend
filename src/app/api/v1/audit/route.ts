@@ -7,6 +7,7 @@ import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
 import { getAuditLogs, getAuditStats, logAuditEvent } from '@/services/audit.service';
 import {
   successResponse,
+  errorResponse,
   serverErrorResponse,
   forbiddenResponse,
   createdResponse,
@@ -89,7 +90,7 @@ async function createAuditLogHandler(req: NextRequest, _context: any, auth: JwtP
     const { action, entity, entityId, entityName, description, changes, metadata } = body;
 
     if (!action || !entity) {
-      return serverErrorResponse('Action and entity are required');
+      return errorResponse('Action and entity are required', 400);
     }
 
     await logAuditEvent({

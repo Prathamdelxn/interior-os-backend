@@ -23,8 +23,8 @@ async function getLeadDetailsHandler(req: NextRequest, context: { params: Promis
       organizationId,
       isDeleted: false,
     })
-      .populate('assignedDesigner', 'name email')
-      .populate('assignedSalesPerson', 'name email');
+      .populate('assignedDesigner', 'firstName lastName email avatar')
+      .populate('assignedSalesPerson', 'firstName lastName email avatar');
 
     if (!lead) {
       return errorResponse('Lead not found', 404);

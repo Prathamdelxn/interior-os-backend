@@ -50,8 +50,22 @@ async function approveCrHandler(
     await changeRequest.save();
 
     // 2. Generate a sequential Variation Order Number
-    const voCount = await VariationOrder.countDocuments({ projectId, organizationId });
-    const voNumber = `VO-${String(voCount + 1).padStart(5, '0')}`;
+    const latestVo = await VariationOrder.findOne({ projectId, organizationId, isDeleted: { $in: [true, false] } })
+      .sort({ createdAt: -1 })
+      .select('voNumber')
+      .lean();
+    let nextNum = 1;
+    if (latestVo?.voNumber) {
+      const match = latestVo.voNumber.match(/(\d+)$/);
+      if (match) nextNum = parseInt(match[1], 10) + 1;
+    }
+    let voNumber = `VO-${String(nextNum).padStart(5, '0')}`;
+    let exists = await VariationOrder.findOne({ projectId, organizationId, voNumber, isDeleted: { $in: [true, false] } });
+    while (exists) {
+      nextNum++;
+      voNumber = `VO-${String(nextNum).padStart(5, '0')}`;
+      exists = await VariationOrder.findOne({ projectId, organizationId, voNumber, isDeleted: { $in: [true, false] } });
+    }
 
     // 3. Map CR fields to VO configurations
     let voType: 'addition' | 'deletion' | 'replacement' | 'quantity_change' = 'addition';

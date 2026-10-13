@@ -141,9 +141,14 @@ async function getGlobalDashboardHandler(req: NextRequest, _context: any, auth: 
 
     const topProjects = [];
 
-    for (const project of allProjects) {
-      const metrics = await calculateProjectMetrics(project._id, organizationId, project);
+    const projectMetricsResults = await Promise.all(
+      allProjects.map(async (project) => {
+        const metrics = await calculateProjectMetrics(project._id, organizationId, project);
+        return { project, metrics };
+      })
+    );
 
+    for (const { project, metrics } of projectMetricsResults) {
       // Increment health counters (completed projects don't count towards active portfolio health stats)
       if (project.status !== 'completed') {
         if (metrics.healthColor === 'red') {

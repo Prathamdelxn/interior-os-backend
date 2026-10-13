@@ -36,6 +36,28 @@ export async function POST(
     // Send the email
     await transporter.sendMail(mailOptions);
 
+    // Record audit event
+    try {
+      const { projectId, purchaseOrderId } = await params;
+      const { logAuditEvent } = await import('@/services/audit.service');
+      const { Project } = await import('@/models/project.model');
+      const proj = await Project.findById(projectId).select('organizationId name').lean();
+      if (proj) {
+        logAuditEvent({
+          organizationId: proj.organizationId,
+          action: 'approve',
+          entity: 'Procurement',
+          entityId: purchaseOrderId,
+          entityName: materialName ? `PO: ${materialName}` : `PO #${purchaseOrderId}`,
+          description: `Sent award notification email to vendor "${vendorName || email}" for "${materialName || 'PO'}"`,
+          metadata: { vendorEmail: email, vendorName, materialName, poLink },
+          req: request,
+        }).catch(() => {});
+      }
+    } catch (auditErr) {
+      console.warn('Failed to record procurement audit event:', auditErr);
+    }
+
     return NextResponse.json(
       { success: true, message: 'Award email sent successfully' },
       { status: 200 }

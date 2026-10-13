@@ -19,7 +19,6 @@ import { DailyProgressReport } from '@/models/dpr.model';
 import { WeeklyReport } from '@/models/weekly-report.model';
 import { Drawing } from '@/models/drawing.model';
 import { MeetingMinutes } from '@/models/mom.model';
-import { NCR } from '@/models/ncr.model';
 import { UtilitySystem } from '@/models/utility.model';
 import { SitePhoto } from '@/models/site-photo.model';
 import { Handover } from '@/models/handover.model';
@@ -52,7 +51,6 @@ async function seedDashboardDataHandler(req: NextRequest, _context: any, auth: J
       WeeklyReport.deleteMany({ organizationId }),
       Drawing.deleteMany({ organizationId }),
       MeetingMinutes.deleteMany({ organizationId }),
-      NCR.deleteMany({ organizationId }),
       UtilitySystem.deleteMany({ organizationId }),
       SitePhoto.deleteMany({ organizationId }),
       Handover.deleteMany({ organizationId }),
@@ -690,18 +688,6 @@ async function seedDashboardDataHandler(req: NextRequest, _context: any, auth: J
     });
     await mom1.save();
 
-    // ── Seed NCRs ────────────────────────────────────────────────────────────
-    const ncr1 = new NCR({
-      organizationId,
-      projectId: p1._id,
-      ncrNumber: 'NCR-001',
-      description: 'HVAC pipe thermal insulation thickness found to be 9mm instead of the approved 13mm class-O specs.',
-      rootCause: 'Subcontractor crew mistakenly picked up remaining stock from standard residential site consignment.',
-      correctiveAction: 'Completely remove the 9mm insulation and replace with approved 13mm class-O nitrile rubber sheets.',
-      status: 'verification'
-    });
-    await ncr1.save();
-
     // ── Seed Utility Systems ──────────────────────────────────────────────────
     const util1 = new UtilitySystem({
       organizationId,
@@ -725,7 +711,7 @@ async function seedDashboardDataHandler(req: NextRequest, _context: any, auth: J
       actualProgress: 70,
       checkpoints: [
         { name: 'GI duct suspension & hangers', status: 'passed', readings: 'Anchor pull test successful' },
-        { name: 'Copper refrigeration pipe insulation', status: 'failed', readings: 'NCR-001 issued for thin insulation' },
+        { name: 'Copper refrigeration pipe insulation', status: 'passed', readings: 'Insulation thickness verified' },
         { name: 'Indoor Unit commissioning', status: 'pending', readings: 'Units mounted, await wiring hookup' }
       ]
     });

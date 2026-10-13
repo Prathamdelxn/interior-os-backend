@@ -7,7 +7,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export interface IAuditLog extends Document {
   _id: mongoose.Types.ObjectId;
   organizationId: mongoose.Types.ObjectId;
-  userId: mongoose.Types.ObjectId;
+  userId?: mongoose.Types.ObjectId;
   action: 'create' | 'update' | 'delete' | 'approve' | 'reject' | 'login' | 'logout' | 'export' | 'upload' | 'download';
   entity: string; // e.g., 'Project', 'Task', 'User'
   entityId: mongoose.Types.ObjectId;
@@ -34,7 +34,7 @@ const AuditLogSchema = new Schema<IAuditLog>(
     userId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
       index: true,
     },
     action: {

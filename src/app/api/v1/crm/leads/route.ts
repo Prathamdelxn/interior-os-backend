@@ -75,8 +75,8 @@ async function getLeadsHandler(req: NextRequest, _context: any, auth: JwtPayload
 
     const total = await CRMLead.countDocuments(query);
     const leads = await CRMLead.find(query)
-      .populate('assignedDesigner', 'name email')
-      .populate('assignedSalesPerson', 'name email')
+      .populate('assignedDesigner', 'firstName lastName email avatar')
+      .populate('assignedSalesPerson', 'firstName lastName email avatar')
       .sort(sortQuery)
       .skip((page - 1) * limit)
       .limit(limit);

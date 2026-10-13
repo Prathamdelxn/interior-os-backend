@@ -59,9 +59,6 @@ export type { IDrawing, IDrawingRevision } from './drawing.model';
 export { MeetingMinutes } from './mom.model';
 export type { IMeetingMinutes, IMOMActionItem } from './mom.model';
 
-export { NCR } from './ncr.model';
-export type { INCR } from './ncr.model';
-
 export { UtilitySystem } from './utility.model';
 export type { IUtilitySystem, IUtilityCheckpoint } from './utility.model';
 

@@ -17,8 +17,8 @@ async function getDprByIdHandler(req: NextRequest, context: { params: Promise<Re
     const { projectId, dprId } = await context.params;
 
     const report = await DailyProgressReport.findOne({ _id: dprId, projectId, organizationId })
-      .populate('projectId', 'name code clientName location')
-      .populate('submittedBy', 'name email');
+      .populate('projectId', 'name code client location')
+      .populate('submittedBy', 'firstName lastName email avatar');
 
     if (!report) {
       return notFoundResponse('Daily Progress Report not found');

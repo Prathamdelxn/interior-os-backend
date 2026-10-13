@@ -8,6 +8,9 @@ import { connectDB } from '@/lib/db';
 import { Project } from '@/models/project.model';
 import { Task } from '@/models/task.model';
 import { Milestone } from '@/models/milestone.model';
+import { Snag } from '@/models/snag.model';
+import { RFI } from '@/models/rfi.model';
+import { Risk } from '@/models/risk.model';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { calculateProjectMetrics } from '@/services/project-metrics.service';
 import { successResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
@@ -48,11 +51,33 @@ async function getProjectDashboardHandler(req: NextRequest, context: { params: P
       delayed: allMilestones.filter(m => m.status === 'delayed').length,
     };
 
-    // 3. Placeholders for subsequent phases (Snags, RFIs, Risks)
+    // 3. Live quality and risk counts (Snags, RFIs, Risks)
+    const [openSnags, openRFIs, criticalRisks] = await Promise.all([
+      Snag.countDocuments({
+        projectId,
+        organizationId,
+        isDeleted: false,
+        status: { $in: ['open', 'assigned', 'in_progress'] },
+      }),
+      RFI.countDocuments({
+        projectId,
+        organizationId,
+        isDeleted: false,
+        status: 'open',
+      }),
+      Risk.countDocuments({
+        projectId,
+        organizationId,
+        isDeleted: false,
+        status: 'open',
+        score: { $gte: 6 },
+      }),
+    ]);
+
     const qualitySummary = {
-      openSnags: 0,
-      openRFIs: 0,
-      criticalRisks: 0,
+      openSnags,
+      openRFIs,
+      criticalRisks,
     };
 
     // Calculate dynamic project metrics

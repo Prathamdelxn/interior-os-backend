@@ -17,7 +17,7 @@ async function getWeeklyReportByIdHandler(req: NextRequest, context: { params: P
     const { projectId, reportId } = await context.params;
 
     const report = await WeeklyReport.findOne({ _id: reportId, projectId, organizationId })
-      .populate('submittedBy', 'name email');
+      .populate('submittedBy', 'firstName lastName email avatar');
 
     if (!report) {
       return notFoundResponse('Weekly Progress Report not found');

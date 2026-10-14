@@ -10,7 +10,7 @@ import { successResponse, errorResponse, validationErrorResponse, serverErrorRes
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-
+console.log("hello",process.env.MONGODB_URI);
     // Validate input
     const validation = loginSchema.safeParse(body);
     if (!validation.success) {

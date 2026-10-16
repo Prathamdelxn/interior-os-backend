@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { TaskComment } from '@/models/task.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -71,5 +72,5 @@ async function createCommentHandler(req: NextRequest, context: { params: Promise
   }
 }
 
-export const GET = withAuth(getCommentsHandler);
-export const POST = withAuth(createCommentHandler);
+export const GET = withProjectPermission('tasks', 'read', getCommentsHandler);
+export const POST = withProjectPermission('tasks', 'read', createCommentHandler);

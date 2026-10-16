@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CRMLead } from '@/models/crm-lead.model';
 import { Project } from '@/models/project.model';
@@ -253,4 +253,4 @@ async function convertLeadHandler(req: NextRequest, context: { params: Promise<R
   }
 }
 
-export const POST = withAuth(convertLeadHandler);
+export const POST = withPermission('crm_quotations', 'approve', convertLeadHandler);

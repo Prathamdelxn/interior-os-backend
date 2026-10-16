@@ -10,6 +10,7 @@ import { connectDB } from '@/lib/db';
 import { User } from '@/models/user.model';
 import { Organization } from '@/models/organization.model';
 import type { ModuleName, PermissionAction } from '@/models/role.model';
+import { can, canAny, isOrgAdmin } from '@/lib/rbac';
 
 // Extend the request with auth context
 export interface AuthenticatedRequest extends NextRequest {
@@ -129,27 +130,41 @@ export function withPermission(
   handler: (req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) => Promise<Response>
 ) {
   return withAuth(async (req, context, auth) => {
-    // Super admin and org admin have all permissions
-    if (auth.systemRole === 'super_admin' || auth.systemRole === 'org_admin') {
-      return handler(req, context, auth);
+    // Admin, or the user's global role (shared rules in lib/rbac)
+    if (!(await can(auth, module, action))) {
+      return forbiddenResponse(`You don't have permission to ${action} ${module.replace(/_/g, ' ')}`);
     }
+    return handler(req, context, auth);
+  });
+}
 
-    // Check role-based permissions
-    await connectDB();
-    const user = await User.findById(auth.userId).populate('role');
-
-    if (!user?.role) {
-      return forbiddenResponse('No role assigned');
+/**
+ * Like withPermission, but any one of `modules` is enough (e.g. reading a CRM
+ * customer is allowed for every CRM stage the user works on).
+ */
+export function withAnyPermission(
+  modules: ModuleName[],
+  action: PermissionAction,
+  handler: (req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) => Promise<Response>
+) {
+  return withAuth(async (req, context, auth) => {
+    if (!(await canAny(auth, modules, action))) {
+      return forbiddenResponse(`You don't have permission to ${action} this`);
     }
+    return handler(req, context, auth);
+  });
+}
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const role = user.role as any;
-    const permission = role.permissions?.find((p: { module: string }) => p.module === module);
-
-    if (!permission || !permission.actions.includes(action)) {
-      return forbiddenResponse(`You don't have permission to ${action} ${module}`);
+/**
+ * Org admins / super admins only (org settings, demo data seeding…)
+ */
+export function withOrgAdmin(
+  handler: (req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) => Promise<Response>
+) {
+  return withAuth(async (req, context, auth) => {
+    if (!isOrgAdmin(auth)) {
+      return forbiddenResponse('Only organization admins can do this');
     }
-
     return handler(req, context, auth);
   });
 }

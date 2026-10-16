@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
@@ -50,4 +51,4 @@ async function uploadHandoverDocumentHandler(
   }
 }
 
-export const POST = withAuth(uploadHandoverDocumentHandler);
+export const POST = withProjectPermission('handover', 'create', uploadHandoverDocumentHandler);

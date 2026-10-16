@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { BOQ } from '@/models/boq.model';
 import { BOQItem } from '@/models/boq.model';
@@ -148,5 +149,5 @@ async function updateItemsHandler(req: NextRequest, context: { params: Promise<R
   }
 }
 
-export const POST = withAuth(addItemsHandler);
-export const PUT = withAuth(updateItemsHandler);
+export const POST = withProjectPermission('boq', 'update', addItemsHandler);
+export const PUT = withProjectPermission('boq', 'update', updateItemsHandler);

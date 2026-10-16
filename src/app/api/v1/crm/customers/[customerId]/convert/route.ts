@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { CrmActivity } from '@/models/crm-activity.model';
@@ -341,4 +341,4 @@ async function convertCustomerHandler(
   }
 }
 
-export const POST = withAuth(convertCustomerHandler);
+export const POST = withPermission('crm_quotations', 'approve', convertCustomerHandler);

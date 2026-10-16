@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CRMLead } from '@/models/crm-lead.model';
 import { User } from '@/models/user.model';
@@ -152,5 +152,5 @@ async function createLeadHandler(req: NextRequest, _context: any, auth: JwtPaylo
   }
 }
 
-export const GET = withAuth(getLeadsHandler);
-export const POST = withAuth(createLeadHandler);
+export const GET = withPermission('crm_leads', 'read', getLeadsHandler);
+export const POST = withPermission('crm_leads', 'create', createLeadHandler);

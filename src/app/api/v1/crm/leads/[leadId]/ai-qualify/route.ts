@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CRMLead } from '@/models/crm-lead.model';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
@@ -119,4 +119,4 @@ async function aiQualifyHandler(req: NextRequest, context: { params: Promise<Rec
   }
 }
 
-export const POST = withAuth(aiQualifyHandler);
+export const POST = withPermission('crm_leads', 'update', aiQualifyHandler);

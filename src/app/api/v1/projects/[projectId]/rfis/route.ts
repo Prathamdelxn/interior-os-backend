@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { RFI } from '@/models/rfi.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
@@ -112,9 +113,9 @@ async function updateRfiHandler(req: NextRequest, context: { params: Promise<Rec
   }
 }
 
-export const GET = withAuth(getRfisHandler);
-export const POST = withAuth(createRfiHandler);
-export const PUT = withAuth(updateRfiHandler);
+export const GET = withProjectPermission('rfis', 'read', getRfisHandler);
+export const POST = withProjectPermission('rfis', 'create', createRfiHandler);
+export const PUT = withProjectPermission('rfis', 'update', updateRfiHandler);
 
 // DELETE: Delete an RFI
 async function deleteRfiHandler(req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) {
@@ -141,4 +142,4 @@ async function deleteRfiHandler(req: NextRequest, context: { params: Promise<Rec
   }
 }
 
-export const DELETE = withAuth(deleteRfiHandler);
+export const DELETE = withProjectPermission('rfis', 'delete', deleteRfiHandler);

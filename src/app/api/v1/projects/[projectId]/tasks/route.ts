@@ -4,7 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
-import { withProjectPermission } from '@/middlewares/project-auth.middleware';
+import { withProjectPermission, withAnyProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Task } from '@/models/task.model';
 import { Package } from '@/models/wbs.model';
@@ -217,5 +217,5 @@ async function createTaskHandler(req: NextRequest, context: { params: Promise<Re
   }
 }
 
-export const GET = withProjectPermission('tasks', 'read', getTasksHandler);
+export const GET = withAnyProjectPermission(['tasks', 'handover'], 'read', getTasksHandler);
 export const POST = withProjectPermission('tasks', 'create', createTaskHandler);

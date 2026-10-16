@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { DailyProgressReport } from '@/models/dpr.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -57,5 +58,5 @@ async function createDprHandler(req: NextRequest, context: { params: Promise<Rec
   }
 }
 
-export const GET = withAuth(getDprsHandler);
-export const POST = withAuth(createDprHandler);
+export const GET = withProjectPermission('dpr', 'read', getDprsHandler);
+export const POST = withProjectPermission('dpr', 'create', createDprHandler);

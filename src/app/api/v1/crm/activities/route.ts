@@ -3,10 +3,12 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withAnyPermission } from '@/middlewares/auth.middleware';
+import { CRM_MODULES, crmModuleForActivityType, crmDeniedMessage } from '@/lib/crm-access';
+import { canAny } from '@/lib/rbac';
 import { connectDB } from '@/lib/db';
 import { CrmActivity } from '@/models/crm-activity.model';
-import { successResponse, createdResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
+import { successResponse, createdResponse, errorResponse, serverErrorResponse, forbiddenResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 
 // GET: List activities for a customer or all activities for organization
@@ -99,6 +101,11 @@ async function createActivityHandler(req: NextRequest, _context: any, auth: JwtP
 
     const validData = validation.data;
 
+    const activityModule = crmModuleForActivityType(validData.type);
+    if (activityModule && !(await canAny(auth, [activityModule], 'create'))) {
+      return forbiddenResponse(crmDeniedMessage(activityModule, 'create'));
+    }
+
     // If creating a new pending activity or site visit, complete any existing pending activities for this customer
     if (validData.status === 'Pending' || validData.type === 'Site Visit') {
       await CrmActivity.updateMany(
@@ -158,5 +165,5 @@ async function createActivityHandler(req: NextRequest, _context: any, auth: JwtP
   }
 }
 
-export const GET = withAuth(getActivitiesHandler);
-export const POST = withAuth(createActivityHandler);
+export const GET = withAnyPermission(CRM_MODULES, 'read', getActivitiesHandler);
+export const POST = withAnyPermission(CRM_MODULES, 'create', createActivityHandler);

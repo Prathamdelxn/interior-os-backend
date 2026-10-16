@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { ChangeRequest, VariationOrder, Project, User } from '@/models';
 import { successResponse, notFoundResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -145,4 +146,4 @@ async function approveCrHandler(
   }
 }
 
-export const POST = withAuth(approveCrHandler);
+export const POST = withProjectPermission('change_requests', 'approve', approveCrHandler);

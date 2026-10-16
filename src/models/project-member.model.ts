@@ -11,7 +11,13 @@ export interface IProjectMember extends Document {
   projectId: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
   projectRole: 'project_manager' | 'site_engineer' | 'quantity_surveyor' | 'designer' | 'client_representative' | 'sub_contractor' | 'viewer';
+  // Optional link to an org Role. When set, the member's project permissions
+  // come live from that role (editing the role updates every member using it);
+  // otherwise the copied `permissions` below are used (legacy / custom).
+  roleId?: mongoose.Types.ObjectId;
   permissions: IPermission[];
+  // Set once lib/role-defaults has added modules introduced after the member was added
+  defaultsVersion?: number;
   isDeleted: boolean;
   deletedAt?: Date;
   createdAt: Date;
@@ -30,6 +36,9 @@ const MemberPermissionSchema = new Schema(
         'ncrs', 'utilities', 'photos', 'handover', 'boq', 'change_requests', 'variation_orders', 'users',
         'roles', 'organization', 'reports', 'notifications',
         'settings', 'audit_logs', 'filemgt', 'financials',
+        'crm_leads', 'crm_followups', 'crm_site_visits',
+        'crm_requirements', 'crm_drawings', 'crm_boq', 'crm_quotations',
+        'quotation', 'inventory', 'templates',
       ],
     },
     actions: [{
@@ -65,10 +74,15 @@ const ProjectMemberSchema = new Schema<IProjectMember>(
       enum: ['project_manager', 'site_engineer', 'quantity_surveyor', 'designer', 'client_representative', 'sub_contractor', 'viewer'],
       default: 'viewer',
     },
+    roleId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Role',
+    },
     permissions: {
       type: [MemberPermissionSchema],
       default: [],
     },
+    defaultsVersion: { type: Number, default: 1 },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date },
   },

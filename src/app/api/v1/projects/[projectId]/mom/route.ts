@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { MeetingMinutes } from '@/models/mom.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
@@ -111,7 +112,7 @@ async function deleteMomHandler(req: NextRequest, context: { params: Promise<Rec
   }
 }
 
-export const GET = withAuth(getMomsHandler);
-export const POST = withAuth(createMomHandler);
-export const PUT = withAuth(updateMomHandler);
-export const DELETE = withAuth(deleteMomHandler);
+export const GET = withProjectPermission('mom', 'read', getMomsHandler);
+export const POST = withProjectPermission('mom', 'create', createMomHandler);
+export const PUT = withProjectPermission('mom', 'update', updateMomHandler);
+export const DELETE = withProjectPermission('mom', 'delete', deleteMomHandler);

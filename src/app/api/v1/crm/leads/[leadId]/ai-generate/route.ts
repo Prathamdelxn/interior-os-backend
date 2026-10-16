@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CRMLead } from '@/models/crm-lead.model';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
@@ -259,4 +259,4 @@ async function aiGenerateHandler(req: NextRequest, context: { params: Promise<Re
   }
 }
 
-export const POST = withAuth(aiGenerateHandler);
+export const POST = withPermission('crm_leads', 'update', aiGenerateHandler);

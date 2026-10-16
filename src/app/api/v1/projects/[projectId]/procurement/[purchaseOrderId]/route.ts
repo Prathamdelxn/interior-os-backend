@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { PurchaseOrder } from '@/models/purchase-order.model';
 import { Inventory } from '@/models/inventory.model';
@@ -20,6 +21,20 @@ const updatePoSchema = z.object({
   grns: z.array(z.any()).optional(),
   grnData: z.any().optional(),
 }).passthrough();
+
+// Compare PO lines by what they mean (name, qty, unit, rate, amount) — stored lines
+// carry _id and other database fields, so a raw JSON comparison never matches.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const itemsSignature = (items: any[] = []) =>
+  JSON.stringify(
+    items.map((i) => [
+      String(i?.name ?? '').trim(),
+      Number(i?.quantity) || 0,
+      String(i?.unit ?? '').trim(),
+      Number(i?.unitPrice) || 0,
+      Number(i?.amount) || 0,
+    ])
+  );
 
 // GET: Retrieve a single PO
 async function getPurchaseOrderDetailsHandler(req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) {
@@ -63,9 +78,11 @@ async function updatePurchaseOrderHandler(req: NextRequest, context: { params: P
       if (body.vendorName && body.vendorName !== oldPo.vendorName) {
         return errorResponse('Vendor cannot be changed once the Purchase Order is approved', 400);
       }
-      if (body.items !== undefined && JSON.stringify(body.items) !== JSON.stringify(oldPo.items)) {
+      if (body.items !== undefined && itemsSignature(body.items) !== itemsSignature(oldPo.toObject().items)) {
         return errorResponse('Rates and items cannot be modified once the Purchase Order is approved', 400);
       }
+      // Unchanged lines: keep the stored ones (with their ids) instead of rewriting them
+      if (body.items !== undefined) delete body.items;
     }
 
     const newStatus = body.status;
@@ -153,6 +170,6 @@ async function deletePurchaseOrderHandler(req: NextRequest, context: { params: P
   }
 }
 
-export const GET = withAuth(getPurchaseOrderDetailsHandler);
-export const PUT = withAuth(updatePurchaseOrderHandler);
-export const DELETE = withAuth(deletePurchaseOrderHandler);
+export const GET = withProjectPermission('procurement', 'read', getPurchaseOrderDetailsHandler);
+export const PUT = withProjectPermission('procurement', 'update', updatePurchaseOrderHandler);
+export const DELETE = withProjectPermission('procurement', 'delete', deletePurchaseOrderHandler);

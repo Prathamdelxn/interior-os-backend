@@ -1,8 +1,10 @@
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withAnyPermission } from '@/middlewares/auth.middleware';
+import { CRM_MODULES, crmModuleForActivityType, crmDeniedMessage } from '@/lib/crm-access';
+import { canAny } from '@/lib/rbac';
 import { connectDB } from '@/lib/db';
 import { CrmActivity } from '@/models/crm-activity.model';
-import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
+import { successResponse, errorResponse, serverErrorResponse, forbiddenResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import mongoose from 'mongoose';
 import { z } from 'zod';
@@ -39,6 +41,11 @@ async function updateActivityHandler(
     const existingActivity = await CrmActivity.findOne({ _id: activityId, organizationId });
     if (!existingActivity) {
       return errorResponse('Activity not found', 404);
+    }
+
+    const activityModule = crmModuleForActivityType(existingActivity.type);
+    if (activityModule && !(await canAny(auth, [activityModule], 'update'))) {
+      return forbiddenResponse(crmDeniedMessage(activityModule));
     }
 
     const updatePayload: any = { ...validation.data };
@@ -87,4 +94,4 @@ async function updateActivityHandler(
   }
 }
 
-export const PATCH = withAuth(updateActivityHandler);
+export const PATCH = withAnyPermission(CRM_MODULES, 'update', updateActivityHandler);

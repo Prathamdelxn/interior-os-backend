@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Vendor } from '@/models/vendor.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -44,5 +44,5 @@ async function createVendorHandler(req: NextRequest, _context: any, auth: JwtPay
   }
 }
 
-export const GET = withAuth(getVendorsHandler);
-export const POST = withAuth(createVendorHandler);
+export const GET = withPermission('vendors', 'read', getVendorsHandler);
+export const POST = withPermission('vendors', 'create', createVendorHandler);

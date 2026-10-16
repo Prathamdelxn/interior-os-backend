@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { ChangeRequest, User } from '@/models';
 import { successResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
@@ -100,5 +101,5 @@ async function updateCrHandler(
   }
 }
 
-export const GET = withAuth(getCrHandler);
-export const PUT = withAuth(updateCrHandler);
+export const GET = withProjectPermission('change_requests', 'read', getCrHandler);
+export const PUT = withProjectPermission('change_requests', 'update', updateCrHandler);

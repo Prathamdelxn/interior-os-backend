@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { SitePhoto } from '@/models/site-photo.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
@@ -78,6 +79,6 @@ async function deletePhotoHandler(req: NextRequest, context: { params: Promise<R
   }
 }
 
-export const GET = withAuth(getPhotosHandler);
-export const POST = withAuth(createPhotoHandler);
-export const DELETE = withAuth(deletePhotoHandler);
+export const GET = withProjectPermission('photos', 'read', getPhotosHandler);
+export const POST = withProjectPermission('photos', 'create', createPhotoHandler);
+export const DELETE = withProjectPermission('photos', 'delete', deletePhotoHandler);

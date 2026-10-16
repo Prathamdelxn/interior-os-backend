@@ -4,10 +4,11 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { can } from '@/lib/rbac';
 import { connectDB } from '@/lib/db';
 import { BOQ } from '@/models/boq.model';
 import { BOQItem } from '@/models/boq.model';
-import { successResponse, notFoundResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
+import { successResponse, notFoundResponse, serverErrorResponse, errorResponse, forbiddenResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import { z } from 'zod';
 
@@ -30,6 +31,17 @@ async function approvalHandler(req: NextRequest, context: { params: Promise<Reco
     }
 
     const { action, reason } = validation.data;
+
+    // Sending for approval is editing the BOQ (Update); approving / rejecting is the decision (Approve)
+    const { projectId: permProjectId } = await context.params;
+    const needed = action === 'submit' ? 'update' : 'approve';
+    if (!(await can(auth, 'boq', needed, permProjectId))) {
+      return forbiddenResponse(
+        action === 'submit'
+          ? "You don't have permission to send BOQs for approval"
+          : "You don't have permission to approve or reject BOQs"
+      );
+    }
 
     const boq = await BOQ.findOne({ _id: boqId, projectId, organizationId, isDeleted: false });
     if (!boq) {

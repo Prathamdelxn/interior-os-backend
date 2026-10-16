@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withOrgAdmin } from '@/middlewares/auth.middleware';
 import { getAuditLogs, getAuditStats, logAuditEvent } from '@/services/audit.service';
 import {
   successResponse,
@@ -113,5 +113,5 @@ async function createAuditLogHandler(req: NextRequest, _context: any, auth: JwtP
   }
 }
 
-export const GET = withAuth(getAuditLogsHandler);
+export const GET = withOrgAdmin(getAuditLogsHandler);
 export const POST = withAuth(createAuditLogHandler);

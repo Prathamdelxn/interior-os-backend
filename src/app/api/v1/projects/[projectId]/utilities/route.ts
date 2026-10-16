@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { UtilitySystem } from '@/models/utility.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
@@ -87,5 +88,5 @@ async function updateUtilityHandler(req: NextRequest, context: { params: Promise
   }
 }
 
-export const GET = withAuth(getUtilitiesHandler);
-export const PUT = withAuth(updateUtilityHandler);
+export const GET = withProjectPermission('utilities', 'read', getUtilitiesHandler);
+export const PUT = withProjectPermission('utilities', 'update', updateUtilityHandler);

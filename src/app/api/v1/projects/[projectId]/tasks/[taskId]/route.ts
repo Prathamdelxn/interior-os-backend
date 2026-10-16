@@ -50,8 +50,9 @@ const updateTaskSchema = z.object({
   description: z.string().optional(),
   status: z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'completed']).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
-  startDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
-  endDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
+  // null / '' clears the date (the edit form sends null when a date is left empty)
+  startDate: z.string().nullable().optional().transform((val) => (val === null || val === '' ? null : val ? new Date(val) : undefined)),
+  endDate: z.string().nullable().optional().transform((val) => (val === null || val === '' ? null : val ? new Date(val) : undefined)),
   assignees: z.array(z.string()).optional(),
   progress: z.number().min(0).max(100).optional(),
   dependencies: z.array(z.string()).optional(),
@@ -144,8 +145,13 @@ async function updateTaskHandler(req: NextRequest, context: { params: Promise<Re
       return notFoundResponse('Task not found');
     }
 
+    // Check the WBS element and its date range only when the update moves the
+    // activity or changes its dates — completing / assigning an activity must not
+    // fail because its WBS was edited or removed afterwards
+    const touchesSchedule =
+      updateData.packageId !== undefined || updateData.startDate !== undefined || updateData.endDate !== undefined;
     const targetPackageId = updateData.packageId || existingTask.packageId;
-    if (targetPackageId) {
+    if (touchesSchedule && targetPackageId) {
       const { Area, Zone, Floor, Building, Package } = await import('@/models/wbs.model');
       const [bldg, floor, zone, area, pkg] = await Promise.all([
         Building.findOne({ _id: targetPackageId, projectId, organizationId }).select('name startDate endDate').lean(),

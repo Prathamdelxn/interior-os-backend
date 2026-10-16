@@ -5,6 +5,7 @@
 import { NextRequest } from 'next/server';
 import { getRedisClient } from '@/lib/redis';
 import { authenticateRequest } from '@/middlewares/auth.middleware';
+import { can } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,11 @@ export async function GET(req: NextRequest, context: { params: Promise<Record<st
   }
 
   const { projectId } = await context.params;
+
+  // Project chat is for this project's members (admins see every project)
+  if (!(await can(payload, 'projects', 'read', projectId))) {
+    return new Response('Forbidden', { status: 403 });
+  }
 
   const baseRedis = await getRedisClient();
   if (!baseRedis) {

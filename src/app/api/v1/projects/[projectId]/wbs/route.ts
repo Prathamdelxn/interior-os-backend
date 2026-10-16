@@ -4,7 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
-import { withProjectPermission } from '@/middlewares/project-auth.middleware';
+import { withProjectPermission, withAnyProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Building, Floor, Zone, Area, Package } from '@/models/wbs.model';
 import { Task } from '@/models/task.model';
@@ -380,7 +380,7 @@ async function deleteWbsNodeHandler(req: NextRequest, context: { params: Promise
   }
 }
 
-export const GET = withProjectPermission('wbs', 'read', getWbsHandler);
+export const GET = withAnyProjectPermission(['wbs', 'tasks', 'handover'], 'read', getWbsHandler);
 export const POST = withProjectPermission('wbs', 'create', addWbsNodeHandler);
 export const PUT = withProjectPermission('wbs', 'update', updateWbsNodeHandler);
 export const DELETE = withProjectPermission('wbs', 'delete', deleteWbsNodeHandler);

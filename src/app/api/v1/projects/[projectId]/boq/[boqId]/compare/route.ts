@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { BOQ } from '@/models/boq.model';
 import { BOQItem } from '@/models/boq.model';
@@ -96,4 +97,4 @@ async function compareBoqHandler(req: NextRequest, context: { params: Promise<Re
   }
 }
 
-export const GET = withAuth(compareBoqHandler);
+export const GET = withProjectPermission('boq', 'read', compareBoqHandler);

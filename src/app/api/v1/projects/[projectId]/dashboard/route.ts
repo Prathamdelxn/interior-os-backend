@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Project } from '@/models/project.model';
 import { Task } from '@/models/task.model';
@@ -140,4 +141,4 @@ async function getProjectDashboardHandler(req: NextRequest, context: { params: P
   }
 }
 
-export const GET = withAuth(getProjectDashboardHandler);
+export const GET = withProjectPermission('projects', 'read', getProjectDashboardHandler);

@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { VariationOrder, Project, User } from '@/models';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
@@ -134,5 +135,5 @@ async function createVariationOrderHandler(
   }
 }
 
-export const GET = withAuth(listVariationOrdersHandler);
-export const POST = withAuth(createVariationOrderHandler);
+export const GET = withProjectPermission('variation_orders', 'read', listVariationOrdersHandler);
+export const POST = withProjectPermission('variation_orders', 'create', createVariationOrderHandler);

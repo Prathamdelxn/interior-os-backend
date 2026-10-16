@@ -3,7 +3,8 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withAnyPermission } from '@/middlewares/auth.middleware';
+import { CRM_MODULES } from '@/lib/crm-access';
 import { connectDB } from '@/lib/db';
 import { CrmActivity } from '@/models/crm-activity.model';
 import { successResponse, serverErrorResponse } from '@/lib/api-response';
@@ -63,4 +64,4 @@ async function getPendingActivitiesHandler(req: NextRequest, _context: any, auth
   }
 }
 
-export const GET = withAuth(getPendingActivitiesHandler);
+export const GET = withAnyPermission(CRM_MODULES, 'read', getPendingActivitiesHandler);

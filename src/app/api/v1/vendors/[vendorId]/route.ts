@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Vendor } from '@/models/vendor.model';
 import { successResponse, notFoundResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -97,7 +97,7 @@ async function deleteVendorHandler(req: NextRequest, context: { params: Promise<
   }
 }
 
-export const GET = withAuth(getVendorHandler);
-export const PATCH = withAuth(updateVendorHandler);
-export const PUT = withAuth(updateVendorHandler);
-export const DELETE = withAuth(deleteVendorHandler);
+export const GET = withPermission('vendors', 'read', getVendorHandler);
+export const PATCH = withPermission('vendors', 'update', updateVendorHandler);
+export const PUT = withPermission('vendors', 'update', updateVendorHandler);
+export const DELETE = withPermission('vendors', 'delete', deleteVendorHandler);

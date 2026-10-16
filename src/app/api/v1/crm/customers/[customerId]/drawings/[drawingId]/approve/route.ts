@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { CrmActivity } from '@/models/crm-activity.model';
@@ -127,4 +127,4 @@ async function approveDrawingHandler(
   }
 }
 
-export const POST = withAuth(approveDrawingHandler);
+export const POST = withPermission('crm_drawings', 'approve', approveDrawingHandler);

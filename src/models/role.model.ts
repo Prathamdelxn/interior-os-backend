@@ -3,6 +3,7 @@
 // =============================================================================
 
 import mongoose, { Schema, Document, Model } from 'mongoose';
+import { DEFAULT_PROJECT_PERMISSIONS } from '@/lib/project-permissions';
 
 // ── Permission Model ─────────────────────────────────────────────────────────
 
@@ -46,7 +47,11 @@ export type ModuleName =
   | 'crm_requirements'
   | 'crm_drawings'
   | 'crm_boq'
-  | 'crm_quotations';
+  | 'crm_quotations'
+  // Sections that existed in the app but had no permission module yet
+  | 'quotation'
+  | 'inventory'
+  | 'templates';
 
 export interface IPermission {
   module: ModuleName;
@@ -63,6 +68,8 @@ export interface IRole extends Document {
   description?: string;
   permissions: IPermission[];
   isSystem: boolean; // System roles can't be deleted
+  // Set once lib/role-defaults has added modules introduced after the role was created
+  defaultsVersion?: number;
   isActive: boolean;
   isDeleted: boolean;
   deletedAt?: Date;
@@ -85,6 +92,7 @@ const PermissionSchema = new Schema<IPermission>(
         'settings', 'audit_logs', 'filemgt', 'financials',
         'crm_leads', 'crm_followups', 'crm_site_visits',
         'crm_requirements', 'crm_drawings', 'crm_boq', 'crm_quotations',
+        'quotation', 'inventory', 'templates',
       ],
     },
     actions: [{
@@ -118,6 +126,7 @@ const RoleSchema = new Schema<IRole>(
     description: { type: String, trim: true, maxlength: 200 },
     permissions: [PermissionSchema],
     isSystem: { type: Boolean, default: false },
+    defaultsVersion: { type: Number, default: 1 },
     isActive: { type: Boolean, default: true },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date },
@@ -152,7 +161,7 @@ export const Role: Model<IRole> =
 
 // ── Default System Roles Template ────────────────────────────────────────────
 
-const allModules: ModuleName[] = [
+export const ALL_MODULES: ModuleName[] = [
   'dashboard', 'projects', 'wbs', 'tasks', 'milestones',
   'dpr', 'weekly_reports', 'procurement', 'purchase_orders',
   'vendors', 'drawings', 'rfis', 'mom', 'risks', 'snags',
@@ -161,9 +170,12 @@ const allModules: ModuleName[] = [
   'settings', 'audit_logs', 'filemgt', 'financials',
   'crm_leads', 'crm_followups', 'crm_site_visits',
   'crm_requirements', 'crm_drawings', 'crm_boq', 'crm_quotations',
+  'quotation', 'inventory', 'templates',
 ];
+const allModules = ALL_MODULES;
 
-const allActions: PermissionAction[] = ['create', 'read', 'update', 'delete', 'approve', 'export', 'manage'];
+export const ALL_ACTIONS: PermissionAction[] = ['create', 'read', 'update', 'delete', 'approve', 'export', 'manage'];
+const allActions = ALL_ACTIONS;
 const readOnly: PermissionAction[] = ['read'];
 const standardActions: PermissionAction[] = ['create', 'read', 'update'];
 
@@ -285,5 +297,23 @@ export const DEFAULT_ROLES = {
     isSystem: true,
   },
 };
+
+// Built-in roles also carry the matching project preset (lib/project-permissions)
+// so that, used as a member's project role, they cover project work — tasks,
+// snags, BOQ… — and not just their CRM stages.
+const ROLE_PROJECT_PRESET = {
+  designer: 'designer',
+  quantity_surveyor: 'quantity_surveyor',
+  site_engineer: 'site_engineer',
+  sub_contractor: 'sub_contractor',
+} as const;
+for (const [roleKey, presetKey] of Object.entries(ROLE_PROJECT_PRESET)) {
+  const permissions = DEFAULT_ROLES[roleKey as keyof typeof ROLE_PROJECT_PRESET].permissions as IPermission[];
+  for (const p of DEFAULT_PROJECT_PERMISSIONS[presetKey]) {
+    if (!permissions.some((x) => x.module === p.module)) {
+      permissions.push({ module: p.module, actions: [...p.actions] });
+    }
+  }
+}
 
 export default Role;

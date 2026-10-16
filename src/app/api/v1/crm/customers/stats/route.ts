@@ -3,7 +3,8 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withAnyPermission } from '@/middlewares/auth.middleware';
+import { CRM_MODULES } from '@/lib/crm-access';
 import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { successResponse, serverErrorResponse } from '@/lib/api-response';
@@ -125,4 +126,4 @@ async function getCustomerStatsHandler(
   }
 }
 
-export const GET = withAuth(getCustomerStatsHandler);
+export const GET = withAnyPermission(CRM_MODULES, 'read', getCustomerStatsHandler);

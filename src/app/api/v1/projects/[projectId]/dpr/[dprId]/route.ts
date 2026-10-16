@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { DailyProgressReport } from '@/models/dpr.model';
 import { successResponse, notFoundResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -51,5 +52,5 @@ async function deleteDprHandler(req: NextRequest, context: { params: Promise<Rec
   }
 }
 
-export const GET = withAuth(getDprByIdHandler);
-export const DELETE = withAuth(deleteDprHandler);
+export const GET = withProjectPermission('dpr', 'read', getDprByIdHandler);
+export const DELETE = withProjectPermission('dpr', 'delete', deleteDprHandler);

@@ -4,7 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
-import { withProjectPermission } from '@/middlewares/project-auth.middleware';
+import { withProjectPermission, withAnyProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Milestone, MilestoneDelay } from '@/models/milestone.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -149,5 +149,5 @@ async function createMilestoneHandler(req: NextRequest, context: { params: Promi
   }
 }
 
-export const GET = withProjectPermission('milestones', 'read', getMilestonesHandler);
+export const GET = withAnyProjectPermission(['milestones', 'tasks'], 'read', getMilestonesHandler);
 export const POST = withProjectPermission('milestones', 'create', createMilestoneHandler);

@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { ChangeRequest, User } from '@/models';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -180,5 +181,5 @@ async function createChangeRequestHandler(
   }
 }
 
-export const GET = withAuth(listChangeRequestsHandler);
-export const POST = withAuth(createChangeRequestHandler);
+export const GET = withProjectPermission('change_requests', 'read', listChangeRequestsHandler);
+export const POST = withProjectPermission('change_requests', 'create', createChangeRequestHandler);

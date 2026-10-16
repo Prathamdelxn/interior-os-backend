@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { VariationOrder, User } from '@/models';
 import { successResponse, serverErrorResponse } from '@/lib/api-response';
@@ -50,4 +51,4 @@ async function getDashboardMetricsHandler(
   }
 }
 
-export const GET = withAuth(getDashboardMetricsHandler);
+export const GET = withProjectPermission('variation_orders', 'read', getDashboardMetricsHandler);

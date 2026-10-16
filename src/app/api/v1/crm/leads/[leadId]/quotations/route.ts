@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CRMLead } from '@/models/crm-lead.model';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
@@ -93,4 +93,4 @@ async function createQuotationHandler(req: NextRequest, context: { params: Promi
   }
 }
 
-export const POST = withAuth(createQuotationHandler);
+export const POST = withPermission('crm_quotations', 'create', createQuotationHandler);

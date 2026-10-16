@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { CrmActivity } from '@/models/crm-activity.model';
@@ -79,4 +79,4 @@ async function deleteDrawingHandler(
   }
 }
 
-export const DELETE = withAuth(deleteDrawingHandler);
+export const DELETE = withPermission('crm_drawings', 'delete', deleteDrawingHandler);

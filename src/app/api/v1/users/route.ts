@@ -35,7 +35,8 @@ async function getUsersHandler(req: NextRequest, _context: any, auth: JwtPayload
     const projectId = searchParams.get('projectId');
     const permission = searchParams.get('permission');
 
-    let users = await User.find({ organizationId }).populate('role', 'name permissions');
+    // Deleted users are soft-deleted (isDeleted) — never list them
+    let users = await User.find({ organizationId, isDeleted: { $ne: true } }).populate('role', 'name permissions');
 
     // Filter by project membership, if requested
     if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
@@ -106,7 +107,9 @@ async function createUserHandler(req: NextRequest, _context: any, auth: JwtPaylo
     const { firstName, lastName, email, password, phone, designation, department, role, systemRole } = validation.data;
 
     const existing = await User.findOne({ email: email.toLowerCase() });
-    if (existing) {
+    // A user deleted from this organization can be created again (their record is restored below)
+    const restoring = !!existing && existing.isDeleted && String(existing.organizationId) === String(organizationId);
+    if (existing && !restoring) {
       return errorResponse('User already exists with this email', 400);
     }
 
@@ -126,18 +129,19 @@ async function createUserHandler(req: NextRequest, _context: any, auth: JwtPaylo
       }
     }
 
-    const newUser = new User({
+    const newUser = restoring ? existing! : new User({ email, organizationId });
+    Object.assign(newUser, {
       firstName,
       lastName,
-      email,
-      password: password || 'Welcome@123',
+      password: password || 'welcome123', // same default as the construction app
       phone,
       designation,
       department,
       role: resolvedRoleId || undefined,
       systemRole: systemRole || 'member',
       status: 'active',
-      organizationId,
+      isDeleted: false,
+      deletedAt: undefined,
     });
 
     await newUser.save();

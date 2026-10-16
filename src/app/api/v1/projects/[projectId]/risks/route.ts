@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Risk } from '@/models/risk.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
@@ -121,7 +122,7 @@ async function deleteRiskHandler(req: NextRequest, context: { params: Promise<Re
   }
 }
 
-export const GET = withAuth(getRisksHandler);
-export const POST = withAuth(createRiskHandler);
-export const PUT = withAuth(updateRiskHandler);
-export const DELETE = withAuth(deleteRiskHandler);
+export const GET = withProjectPermission('risks', 'read', getRisksHandler);
+export const POST = withProjectPermission('risks', 'create', createRiskHandler);
+export const PUT = withProjectPermission('risks', 'update', updateRiskHandler);
+export const DELETE = withProjectPermission('risks', 'delete', deleteRiskHandler);

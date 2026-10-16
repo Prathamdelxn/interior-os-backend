@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { BOQ } from '@/models/boq.model';
 import { BOQItem } from '@/models/boq.model';
@@ -181,6 +182,6 @@ async function deleteBoqHandler(req: NextRequest, context: { params: Promise<Rec
   }
 }
 
-export const GET = withAuth(getBoqHandler);
-export const PUT = withAuth(updateBoqHandler);
-export const DELETE = withAuth(deleteBoqHandler);
+export const GET = withProjectPermission('boq', 'read', getBoqHandler);
+export const PUT = withProjectPermission('boq', 'update', updateBoqHandler);
+export const DELETE = withProjectPermission('boq', 'delete', deleteBoqHandler);

@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withOrgAdmin } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/user.model';
 import { ProjectMember } from '@/models/project-member.model';
@@ -66,4 +66,4 @@ async function getUsersWithProjectsHandler(req: NextRequest, _context: any, auth
   }
 }
 
-export const GET = withAuth(getUsersWithProjectsHandler);
+export const GET = withOrgAdmin(getUsersWithProjectsHandler); // the Users tab is admin-only

@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Project } from '@/models/project.model';
 import { uploadToCloudinary } from '@/lib/cloudinary';
@@ -87,4 +88,4 @@ async function uploadModelHandler(
   }
 }
 
-export const POST = withAuth(uploadModelHandler);
+export const POST = withProjectPermission('projects', 'update', uploadModelHandler);

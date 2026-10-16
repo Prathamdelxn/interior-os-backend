@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { CRMLead } from '@/models/crm-lead.model';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
@@ -230,6 +230,6 @@ async function deleteLeadHandler(req: NextRequest, context: { params: Promise<Re
   }
 }
 
-export const GET = withAuth(getLeadDetailsHandler);
-export const PUT = withAuth(updateLeadHandler);
-export const DELETE = withAuth(deleteLeadHandler);
+export const GET = withPermission('crm_leads', 'read', getLeadDetailsHandler);
+export const PUT = withPermission('crm_leads', 'update', updateLeadHandler);
+export const DELETE = withPermission('crm_leads', 'delete', deleteLeadHandler);

@@ -3,11 +3,12 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission, withAnyPermission } from '@/middlewares/auth.middleware';
+import { CRM_MODULES, canUpdateCustomer, crmDeniedMessage } from '@/lib/crm-access';
 import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { CrmActivity } from '@/models/crm-activity.model';
-import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
+import { successResponse, errorResponse, serverErrorResponse, forbiddenResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import mongoose from 'mongoose';
 import { z } from 'zod';
@@ -132,6 +133,12 @@ async function updateCustomerHandler(
       return errorResponse('Customer not found', 404);
     }
 
+    // Each CRM stage has its own permission (site visit, requirements, drawings, BOQ, quotation…)
+    const access = await canUpdateCustomer(auth, existing.toObject() as unknown as Record<string, unknown>, validation.data as Record<string, unknown>);
+    if (!access.ok) {
+      return forbiddenResponse(crmDeniedMessage(access.module, access.action));
+    }
+
     const updateData: any = { ...validation.data };
     const unsetData: any = {};
 
@@ -237,8 +244,8 @@ async function updateCustomerHandler(
   }
 }
 
-export const GET = withAuth(getSingleCustomerHandler);
-export const PATCH = withAuth(updateCustomerHandler);
+export const GET = withAnyPermission(CRM_MODULES, 'read', getSingleCustomerHandler);
+export const PATCH = withAnyPermission(CRM_MODULES, 'update', updateCustomerHandler);
 
 // DELETE: Delete a Customer Lead
 async function deleteCustomerHandler(
@@ -302,4 +309,4 @@ async function deleteCustomerHandler(
   }
 }
 
-export const DELETE = withAuth(deleteCustomerHandler);
+export const DELETE = withPermission('crm_leads', 'delete', deleteCustomerHandler);

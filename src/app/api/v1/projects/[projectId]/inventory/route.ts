@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission, withAnyProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Inventory } from '@/models/inventory.model';
 import { successResponse, notFoundResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -112,5 +113,5 @@ async function logInstallationHandler(req: NextRequest, context: { params: Promi
   }
 }
 
-export const GET = withAuth(getInventoryHandler);
-export const POST = withAuth(logInstallationHandler);
+export const GET = withAnyProjectPermission(['inventory', 'tasks'], 'read', getInventoryHandler);
+export const POST = withProjectPermission('inventory', 'create', logInstallationHandler);

@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { VariationOrder, User } from '@/models';
 import { successResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
@@ -96,5 +97,5 @@ async function updateVoHandler(
   }
 }
 
-export const GET = withAuth(getVoHandler);
-export const PUT = withAuth(updateVoHandler);
+export const GET = withProjectPermission('variation_orders', 'read', getVoHandler);
+export const PUT = withProjectPermission('variation_orders', 'update', updateVoHandler);

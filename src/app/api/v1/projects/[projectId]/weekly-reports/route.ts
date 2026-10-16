@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { WeeklyReport } from '@/models/weekly-report.model';
 import { Task } from '@/models/task.model';
@@ -131,5 +132,5 @@ async function createWeeklyReportHandler(req: NextRequest, context: { params: Pr
   }
 }
 
-export const GET = withAuth(getWeeklyReportsHandler);
-export const POST = withAuth(createWeeklyReportHandler);
+export const GET = withProjectPermission('weekly_reports', 'read', getWeeklyReportsHandler);
+export const POST = withProjectPermission('weekly_reports', 'create', createWeeklyReportHandler);

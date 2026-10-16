@@ -5,9 +5,11 @@
 import { NextRequest } from 'next/server';
 import mongoose from 'mongoose';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission, withAnyProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Drawing } from '@/models/drawing.model';
-import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
+import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse, forbiddenResponse } from '@/lib/api-response';
+import { can } from '@/lib/rbac';
 import type { JwtPayload } from '@/lib/jwt';
 
 // GET: Retrieve all drawings for the project
@@ -84,6 +86,17 @@ async function updateDrawingHandler(req: NextRequest, context: { params: Promise
     const { drawingId, status, fileUrl, url, changes, revisionName, revision, title, discipline, drawingType, fileType, annotations } = body;
     if (!drawingId) {
       return errorResponse('drawingId is required', 400);
+    }
+
+    // Approving / rejecting (a status-only change to approved or rejected) is an Approve decision;
+    // every other change is an edit (Update)
+    const otherFields = Object.keys(body).filter((k) => k !== 'drawingId' && k !== 'status' && body[k] !== undefined);
+    const isDecision = (status === 'approved' || status === 'rejected') && otherFields.length === 0;
+    const needed = isDecision ? 'approve' : 'update';
+    if (!(await can(auth, 'drawings', needed, projectId))) {
+      return forbiddenResponse(
+        isDecision ? "You don't have permission to approve or reject drawings" : "You don't have permission to update drawings"
+      );
     }
 
     const query: any = {};
@@ -179,7 +192,7 @@ async function deleteDrawingHandler(req: NextRequest, context: { params: Promise
   }
 }
 
-export const GET = withAuth(getDrawingsHandler);
-export const POST = withAuth(createDrawingHandler);
-export const PUT = withAuth(updateDrawingHandler);
-export const DELETE = withAuth(deleteDrawingHandler);
+export const GET = withAnyProjectPermission(['drawings', 'handover'], 'read', getDrawingsHandler);
+export const POST = withProjectPermission('drawings', 'create', createDrawingHandler);
+export const PUT = withAuth(updateDrawingHandler); // permission checked inside (Approve vs Update)
+export const DELETE = withProjectPermission('drawings', 'delete', deleteDrawingHandler);

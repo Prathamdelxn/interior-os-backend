@@ -4,9 +4,11 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Handover } from '@/models';
-import { successResponse, createdResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
+import { successResponse, createdResponse, serverErrorResponse, errorResponse, forbiddenResponse } from '@/lib/api-response';
+import { can } from '@/lib/rbac';
 import type { JwtPayload } from '@/lib/jwt';
 
 // GET: Retrieve handover status and checklist for the project
@@ -53,6 +55,11 @@ async function updateHandoverHandler(req: NextRequest, context: { params: Promis
     const body = await req.json();
 
     const { taskName, status, documentName, documentUrl, documentType, checklist, deleteDocumentId } = body;
+    // Adding a close-out document is Create, removing one Delete, the checklist Update
+    const needed = deleteDocumentId ? 'delete' : documentName && documentUrl ? 'create' : 'update';
+    if (!(await can(auth, 'handover', needed, projectId))) {
+      return forbiddenResponse(`You don't have permission to ${needed} handover ${needed === 'update' ? 'checklist items' : 'documents'}`);
+    }
 
     let handover = await Handover.findOne({ projectId, organizationId });
     if (!handover) {
@@ -109,5 +116,5 @@ async function updateHandoverHandler(req: NextRequest, context: { params: Promis
   }
 }
 
-export const GET = withAuth(getHandoverHandler);
-export const POST = withAuth(updateHandoverHandler);
+export const GET = withProjectPermission('handover', 'read', getHandoverHandler);
+export const POST = withAuth(updateHandoverHandler); // permission checked inside (create / update / delete)

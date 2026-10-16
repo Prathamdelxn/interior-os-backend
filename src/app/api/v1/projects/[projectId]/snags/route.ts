@@ -5,7 +5,7 @@
 import { NextRequest } from 'next/server';
 import mongoose from 'mongoose';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
-import { withProjectPermission } from '@/middlewares/project-auth.middleware';
+import { withProjectPermission, withAnyProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Snag } from '@/models/snag.model';
 import { Drawing } from '@/models/drawing.model';
@@ -167,7 +167,7 @@ async function deleteSnagHandler(req: NextRequest, context: { params: Promise<Re
   }
 }
 
-export const GET = withProjectPermission('snags', 'read', getSnagsHandler);
+export const GET = withAnyProjectPermission(['snags', 'handover'], 'read', getSnagsHandler);
 export const POST = withProjectPermission('snags', 'create', createSnagHandler);
 export const PUT = withProjectPermission('snags', 'update', updateSnagHandler);
 export const DELETE = withProjectPermission('snags', 'delete', deleteSnagHandler);

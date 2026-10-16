@@ -10,6 +10,7 @@ const full: PermissionAction[] = ['create', 'read', 'update', 'delete', 'approve
 const crud: PermissionAction[] = ['create', 'read', 'update', 'delete'];
 const readOnly: PermissionAction[] = ['read'];
 const ownOnly: PermissionAction[] = ['read', 'update']; // For "own-assigned" scope
+const raise: PermissionAction[] = ['create', 'read', 'update']; // Raise / edit, no delete or approve
 
 function perm(module: ModuleName, actions: PermissionAction[]): IPermission {
   return { module, actions };
@@ -39,7 +40,15 @@ export const PROJECT_MODULES: { module: ModuleName; label: string }[] = [
   { module: 'users', label: 'Team / Members' },
   { module: 'filemgt', label: 'File Management' },
   { module: 'financials', label: 'Payments & Financials' },
+  { module: 'boq', label: 'BOQ' },
+  { module: 'quotation', label: 'Quotation' },
+  { module: 'inventory', label: 'Inventory' },
+  { module: 'change_requests', label: 'Change Requests' },
+  { module: 'variation_orders', label: 'Variation Orders' },
 ];
+
+/** Modules added to the presets after members were already created (see roles/sync-defaults). */
+export const LATE_PROJECT_MODULES: ModuleName[] = ['boq', 'quotation', 'inventory', 'change_requests', 'variation_orders'];
 
 // ── Default permission presets per project role ──────────────────────────────
 
@@ -76,6 +85,11 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('users', full),
     perm('filemgt', full),
     perm('financials', full),
+    perm('boq', full),
+    perm('quotation', full),
+    perm('inventory', full),
+    perm('change_requests', full),
+    perm('variation_orders', full),
   ],
 
   // ── Site Engineer: Field-focused CRUD + own tasks ──
@@ -101,6 +115,10 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('users', readOnly),
     perm('filemgt', crud),
     perm('financials', readOnly),
+    perm('boq', readOnly),
+    perm('inventory', crud),
+    perm('change_requests', raise),
+    perm('variation_orders', readOnly),
   ],
 
   // ── Quantity Surveyor: Procurement/POs/Utilities focused ──
@@ -125,6 +143,11 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('handover', readOnly),
     perm('filemgt', crud),
     perm('financials', crud),
+    perm('boq', crud),
+    perm('quotation', crud),
+    perm('inventory', crud),
+    perm('change_requests', readOnly),
+    perm('variation_orders', crud),
   ],
 
   // ── Designer: Drawings/RFIs/Photos focused ──
@@ -143,6 +166,9 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('handover', readOnly),
     perm('filemgt', crud),
     perm('financials', readOnly),
+    perm('boq', readOnly),
+    perm('change_requests', raise),
+    perm('variation_orders', readOnly),
   ],
 
   // ── Sub Contractor: Own tasks + limited read ──
@@ -159,6 +185,7 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('photos', readOnly),
     perm('filemgt', readOnly),
     perm('financials', readOnly),
+    perm('inventory', readOnly),
   ],
 
   // ── Client Representative: Read-heavy + project config read ──
@@ -183,6 +210,10 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('handover', readOnly),
     perm('filemgt', readOnly),
     perm('financials', readOnly),
+    perm('boq', readOnly),
+    perm('quotation', readOnly),
+    perm('change_requests', ['create', 'read']),
+    perm('variation_orders', readOnly),
   ],
 
   // ── Viewer: Read-only everywhere ──
@@ -207,6 +238,11 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('handover', readOnly),
     perm('filemgt', readOnly),
     perm('financials', readOnly),
+    perm('boq', readOnly),
+    perm('quotation', readOnly),
+    perm('inventory', readOnly),
+    perm('change_requests', readOnly),
+    perm('variation_orders', readOnly),
   ],
 };
 

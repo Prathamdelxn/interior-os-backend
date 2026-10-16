@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withOrgAdmin } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Organization } from '@/models/organization.model';
 import { successResponse, errorResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
@@ -112,4 +112,4 @@ async function updateSettingsHandler(req: NextRequest, _context: any, auth: JwtP
 }
 
 export const GET = withAuth(getSettingsHandler);
-export const PATCH = withAuth(updateSettingsHandler);
+export const PATCH = withOrgAdmin(updateSettingsHandler);

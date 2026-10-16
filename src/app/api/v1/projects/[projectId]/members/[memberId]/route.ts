@@ -11,6 +11,7 @@ import { successResponse, notFoundResponse, serverErrorResponse, errorResponse }
 import type { JwtPayload } from '@/lib/jwt';
 import { getDefaultPermissionsForRole } from '@/lib/project-permissions';
 import type { ProjectRole } from '@/lib/project-permissions';
+import { resolveProjectRole } from '@/lib/rbac';
 import { z } from 'zod';
 
 const updateMemberSchema = z.object({
@@ -25,6 +26,8 @@ const updateMemberSchema = z.object({
     })
   ).optional(),
   resetPermissions: z.boolean().optional(), // If true, reset permissions to role defaults
+  // Link an org Role as the project role (null removes the link)
+  roleId: z.string().nullable().optional(),
 });
 
 // PATCH: Update a member's role and/or permissions
@@ -40,7 +43,7 @@ async function updateMemberHandler(req: NextRequest, context: { params: Promise<
       return errorResponse(validation.error.issues[0].message, 400);
     }
 
-    const { projectRole, permissions, resetPermissions } = validation.data;
+    const { projectRole, permissions, resetPermissions, roleId } = validation.data;
 
     const member = await ProjectMember.findOne({
       _id: memberId,
@@ -53,16 +56,31 @@ async function updateMemberHandler(req: NextRequest, context: { params: Promise<
       return notFoundResponse('Project member not found');
     }
 
+    // 0. Link (or unlink) an org Role as this member's project role
+    if (roleId !== undefined) {
+      if (roleId === null) {
+        member.roleId = undefined;
+      } else {
+        const resolved = await resolveProjectRole(organizationId, roleId);
+        if (!resolved) return errorResponse('Role not found in this organization', 400);
+        member.roleId = resolved.roleId;
+        member.projectRole = resolved.projectRole;
+        member.permissions = resolved.permissions as any;
+        member.markModified('permissions');
+      }
+    }
     // 1. If explicit resetPermissions flag is set, reset to current/new role's defaults
-    if (resetPermissions) {
+    else if (resetPermissions) {
+      member.roleId = undefined;
       if (projectRole && projectRole !== member.projectRole) {
         member.projectRole = projectRole;
       }
       member.permissions = getDefaultPermissionsForRole(member.projectRole as ProjectRole);
       member.markModified('permissions');
     }
-    // 2. Otherwise, if custom permissions are provided, apply them
+    // 2. Otherwise, if custom permissions are provided, apply them (custom → no linked role)
     else if (permissions) {
+      member.roleId = undefined;
       if (projectRole && projectRole !== member.projectRole) {
         member.projectRole = projectRole;
       }
@@ -71,6 +89,7 @@ async function updateMemberHandler(req: NextRequest, context: { params: Promise<
     }
     // 3. Otherwise, if only the role is changing, update role and reset to defaults
     else if (projectRole && projectRole !== member.projectRole) {
+      member.roleId = undefined;
       member.projectRole = projectRole;
       member.permissions = getDefaultPermissionsForRole(projectRole as ProjectRole);
       member.markModified('permissions');

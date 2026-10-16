@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import mongoose from 'mongoose';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Project } from '@/models/project.model';
 import { ProjectMember } from '@/models/project-member.model';
@@ -392,4 +392,4 @@ function formatRelativeTime(date: Date): string {
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-export const GET = withAuth(getGlobalDashboardHandler);
+export const GET = withPermission('dashboard', 'read', getGlobalDashboardHandler);

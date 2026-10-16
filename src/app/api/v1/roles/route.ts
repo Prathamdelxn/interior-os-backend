@@ -5,9 +5,12 @@
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
-import { Role, DEFAULT_ROLES } from '@/models/role.model';
+import { Role, DEFAULT_ROLES, ALL_MODULES, ALL_ACTIONS } from '@/models/role.model';
+import type { ModuleName, PermissionAction } from '@/models/role.model';
+import { can, isOrgAdmin, getGlobalPermissions, permissionListAllows } from '@/lib/rbac';
 import { successResponse, createdResponse, errorResponse, forbiddenResponse, serverErrorResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
+import { ensureOrgPermissionDefaults } from '@/lib/role-defaults';
 import { z } from 'zod';
 
 const createRoleSchema = z.object({
@@ -15,8 +18,8 @@ const createRoleSchema = z.object({
   description: z.string().max(200).optional(),
   permissions: z.array(
     z.object({
-      module: z.string(),
-      actions: z.array(z.string()),
+      module: z.enum(ALL_MODULES as [ModuleName, ...ModuleName[]]),
+      actions: z.array(z.enum(ALL_ACTIONS as [PermissionAction, ...PermissionAction[]])),
     })
   ).optional(),
 });
@@ -60,6 +63,9 @@ async function getRolesHandler(_req: NextRequest, _context: any, auth: JwtPayloa
       );
     }
 
+    // Add modules introduced after these roles were saved (once per record)
+    await ensureOrgPermissionDefaults(organizationId);
+
     const roles = await Role.find({ organizationId, isDeleted: false }).sort({ createdAt: 1 });
 
     return successResponse(roles);
@@ -72,8 +78,9 @@ async function getRolesHandler(_req: NextRequest, _context: any, auth: JwtPayloa
 // POST /api/v1/roles: Create custom role
 async function createRoleHandler(req: NextRequest, _context: any, auth: JwtPayload) {
   try {
-    if (auth.systemRole !== 'super_admin' && auth.systemRole !== 'org_admin') {
-      return forbiddenResponse('Only organization admins can create custom roles');
+    // Org admins, or users whose role has Roles > Create
+    if (!(await can(auth, 'roles', 'create'))) {
+      return forbiddenResponse("You don't have permission to create roles");
     }
 
     await connectDB();
@@ -86,6 +93,17 @@ async function createRoleHandler(req: NextRequest, _context: any, auth: JwtPaylo
     }
 
     const { name, description, permissions } = validation.data;
+
+    // No self-escalation: a non-admin can't grant permissions they don't hold
+    if (permissions && !isOrgAdmin(auth)) {
+      const own = await getGlobalPermissions(auth.userId);
+      const exceeding = permissions.flatMap((p) =>
+        p.actions.filter((a) => !permissionListAllows(own, p.module, a)).map((a) => `${p.module}.${a}`)
+      );
+      if (exceeding.length > 0) {
+        return forbiddenResponse(`You can't grant permissions you don't have yourself (${exceeding.slice(0, 3).join(', ')}${exceeding.length > 3 ? ', …' : ''})`);
+      }
+    }
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
     const existing = await Role.findOne({ organizationId, slug, isDeleted: false });

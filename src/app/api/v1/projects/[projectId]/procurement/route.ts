@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { PurchaseOrder } from '@/models/purchase-order.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -103,5 +104,5 @@ async function createPurchaseOrderHandler(req: NextRequest, context: { params: P
   }
 }
 
-export const GET = withAuth(getPurchaseOrdersHandler);
-export const POST = withAuth(createPurchaseOrderHandler);
+export const GET = withProjectPermission('procurement', 'read', getPurchaseOrdersHandler);
+export const POST = withProjectPermission('procurement', 'create', createPurchaseOrderHandler);

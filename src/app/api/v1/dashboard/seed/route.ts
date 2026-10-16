@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withOrgAdmin } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Project } from '@/models/project.model';
 import { ProjectMember } from '@/models/project-member.model';
@@ -763,4 +763,4 @@ async function seedDashboardDataHandler(req: NextRequest, _context: any, auth: J
   }
 }
 
-export const POST = withAuth(seedDashboardDataHandler);
+export const POST = withOrgAdmin(seedDashboardDataHandler);

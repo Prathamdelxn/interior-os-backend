@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withProjectPermission } from '@/middlewares/project-auth.middleware';
 import { connectDB } from '@/lib/db';
 import { Milestone, MilestoneDelay } from '@/models/milestone.model';
 import { successResponse, notFoundResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
@@ -64,4 +65,4 @@ async function logDelayHandler(req: NextRequest, context: { params: Promise<Reco
   }
 }
 
-export const POST = withAuth(logDelayHandler);
+export const POST = withProjectPermission('milestones', 'update', logDelayHandler);

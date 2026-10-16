@@ -5,7 +5,8 @@
 
 import { NextRequest } from 'next/server';
 import crypto from 'crypto';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withAnyPermission } from '@/middlewares/auth.middleware';
+import { CRM_MODULES } from '@/lib/crm-access';
 import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
@@ -149,5 +150,5 @@ async function revokeShareLinkHandler(
   }
 }
 
-export const POST = withAuth(generateShareLinkHandler);
-export const DELETE = withAuth(revokeShareLinkHandler);
+export const POST = withAnyPermission(CRM_MODULES, 'update', generateShareLinkHandler);
+export const DELETE = withAnyPermission(CRM_MODULES, 'update', revokeShareLinkHandler);

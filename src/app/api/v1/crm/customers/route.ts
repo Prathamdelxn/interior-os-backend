@@ -3,7 +3,8 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission, withAnyPermission } from '@/middlewares/auth.middleware';
+import { CRM_MODULES } from '@/lib/crm-access';
 import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import {
@@ -334,5 +335,5 @@ async function createCustomerHandler(req: NextRequest, _context: any, auth: JwtP
   }
 }
 
-export const GET = withAuth(getCustomersHandler);
-export const POST = withAuth(createCustomerHandler);
+export const GET = withAnyPermission(CRM_MODULES, 'read', getCustomersHandler);
+export const POST = withPermission('crm_leads', 'create', createCustomerHandler);

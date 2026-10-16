@@ -9,6 +9,8 @@ import { User } from '@/models/user.model';
 import { Organization } from '@/models/organization.model';
 import { successResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
+import { canAny, canOnAnyRole } from '@/lib/rbac';
+import { CRM_MODULES } from '@/lib/crm-access';
 
 async function handler(_req: NextRequest, _context: { params: Promise<Record<string, string>> }, auth: JwtPayload) {
   try {
@@ -20,6 +22,15 @@ async function handler(_req: NextRequest, _context: { params: Promise<Record<str
     }
 
     const organization = await Organization.findById(auth.organizationId);
+
+    // Sidebar sections this user can open (org role, or a project role for Projects)
+    const navAccess = {
+      dashboard: await canAny(auth, ['dashboard'], 'read'),
+      crm: await canAny(auth, CRM_MODULES, 'read'),
+      projects: await canOnAnyRole(auth, 'projects', 'read'),
+      vendors: await canAny(auth, ['vendors'], 'read'),
+      usersRoles: await canAny(auth, ['roles'], 'read'), // admins always pass canAny
+    };
 
     return successResponse({
       user: {
@@ -38,6 +49,7 @@ async function handler(_req: NextRequest, _context: { params: Promise<Record<str
         preferences: user.preferences,
         lastLoginAt: user.lastLoginAt,
         role: user.role,
+        navAccess,
       },
       organization: organization
         ? {

@@ -3,7 +3,8 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.middleware';
+import { isOrgAdmin, projectIdsAllowing } from '@/lib/rbac';
 import { connectDB } from '@/lib/db';
 import { Project } from '@/models/project.model';
 import { CrmCustomer } from '@/models/crm-customer.model';
@@ -14,7 +15,7 @@ import { Milestone } from '@/models/milestone.model';
 import { PurchaseOrder } from '@/models/purchase-order.model';
 import { ProjectTemplate } from '@/models/project-template.model';
 import { calculateProjectMetrics } from '@/services/project-metrics.service';
-import { successResponse, createdResponse, serverErrorResponse, paginatedResponse, parsePaginationParams, buildPaginationMeta, errorResponse } from '@/lib/api-response';
+import { successResponse, createdResponse, serverErrorResponse, paginatedResponse, parsePaginationParams, buildPaginationMeta, errorResponse, forbiddenResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import { z } from 'zod';
 import mongoose from 'mongoose';
@@ -58,14 +59,14 @@ async function getProjectsHandler(req: NextRequest, _context: any, auth: JwtPayl
 
     const query: any = { organizationId, isDeleted: false };
 
-    // If the user is a regular member, restrict to projects they belong to
-    if (auth.systemRole !== 'super_admin' && auth.systemRole !== 'org_admin') {
-      const userMemberships = await ProjectMember.find({
-        userId: auth.userId,
-        organizationId,
-        isDeleted: false,
-      }).select('projectId');
-      const projectIds = userMemberships.map((m) => m.projectId);
+    // Regular members: only projects they belong to AND may view
+    // (Project Config → View from their org role or their role in that project)
+    if (!isOrgAdmin(auth)) {
+      const projectIds = await projectIdsAllowing(auth, 'projects', 'read');
+      const memberOfAny = await ProjectMember.exists({ userId: auth.userId, organizationId, isDeleted: false });
+      if (projectIds.length === 0 && memberOfAny) {
+        return forbiddenResponse("You don't have permission to view projects");
+      }
       query._id = { $in: projectIds };
     }
 
@@ -410,4 +411,4 @@ async function createProjectHandler(req: NextRequest, _context: any, auth: JwtPa
 }
 
 export const GET = withAuth(getProjectsHandler);
-export const POST = withAuth(createProjectHandler);
+export const POST = withPermission('projects', 'create', createProjectHandler);

@@ -4,7 +4,8 @@ import { connectDB } from '@/lib/db';
 import { PurchaseOrder } from '@/models/purchase-order.model';
 import { Vendor } from '@/models/vendor.model';
 import { sendEmail } from '@/lib/email';
-import { successResponse, serverErrorResponse, errorResponse } from '@/lib/api-response';
+import { successResponse, serverErrorResponse, errorResponse, forbiddenResponse } from '@/lib/api-response';
+import { can } from '@/lib/rbac';
 import type { JwtPayload } from '@/lib/jwt';
 import { z } from 'zod';
 
@@ -37,6 +38,10 @@ async function sendRfqHandler(req: NextRequest, _context: any, auth: JwtPayload)
 
     if (!po) {
       return errorResponse('Purchase Order not found', 404);
+    }
+
+    if (!(await can(auth, 'procurement', 'update', String(po.projectId)))) {
+      return forbiddenResponse("You don't have permission to send RFQs in this project");
     }
 
     // 2. Fetch Vendors

@@ -5,7 +5,10 @@
 import { NextRequest } from 'next/server';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
-import { Role } from '@/models/role.model';
+import { Role, ALL_MODULES, ALL_ACTIONS } from '@/models/role.model';
+import type { ModuleName, PermissionAction, IPermission } from '@/models/role.model';
+import { ProjectMember } from '@/models/project-member.model';
+import { can, isOrgAdmin, getGlobalPermissions, permissionListAllows } from '@/lib/rbac';
 import { User } from '@/models/user.model';
 import {
   successResponse,
@@ -24,8 +27,8 @@ const updateRoleSchema = z.object({
   permissions: z
     .array(
       z.object({
-        module: z.string(),
-        actions: z.array(z.string()),
+        module: z.enum(ALL_MODULES as [ModuleName, ...ModuleName[]]),
+        actions: z.array(z.enum(ALL_ACTIONS as [PermissionAction, ...PermissionAction[]])),
       })
     )
     .optional(),
@@ -66,8 +69,9 @@ async function updateRoleHandler(
   auth: JwtPayload
 ) {
   try {
-    if (auth.systemRole !== 'super_admin' && auth.systemRole !== 'org_admin') {
-      return forbiddenResponse('Only organization admins can update roles');
+    // Org admins, or users whose role has Roles > Update
+    if (!(await can(auth, 'roles', 'update'))) {
+      return forbiddenResponse("You don't have permission to update roles");
     }
 
     await connectDB();
@@ -90,6 +94,27 @@ async function updateRoleHandler(
     }
 
     const { name, description, permissions, isActive } = validation.data;
+
+    // The Admin role always has full access — it can't be changed
+    if (role.slug === 'admin' && (permissions !== undefined || isActive !== undefined)) {
+      return forbiddenResponse('The Admin role is locked and cannot be modified');
+    }
+
+    // No self-escalation: a non-admin can't ADD permissions they don't hold.
+    // Permissions the role already has are left alone, so other edits still save.
+    if (permissions && !isOrgAdmin(auth)) {
+      const own = await getGlobalPermissions(auth.userId);
+      const current = (role.permissions || []) as IPermission[];
+      const exceeding = permissions.flatMap((p) =>
+        p.actions
+          .filter((a) => !permissionListAllows(current, p.module, a)) // newly added
+          .filter((a) => !permissionListAllows(own, p.module, a))
+          .map((a) => `${p.module}.${a}`)
+      );
+      if (exceeding.length > 0) {
+        return forbiddenResponse(`You can't grant permissions you don't have yourself (${exceeding.slice(0, 3).join(', ')}${exceeding.length > 3 ? ', …' : ''})`);
+      }
+    }
 
     if (name && name !== role.name) {
       if (role.isSystem) {
@@ -129,8 +154,9 @@ async function deleteRoleHandler(
   auth: JwtPayload
 ) {
   try {
-    if (auth.systemRole !== 'super_admin' && auth.systemRole !== 'org_admin') {
-      return forbiddenResponse('Only organization admins can delete roles');
+    // Org admins, or users whose role has Roles > Delete
+    if (!(await can(auth, 'roles', 'delete'))) {
+      return forbiddenResponse("You don't have permission to delete roles");
     }
 
     await connectDB();
@@ -160,6 +186,15 @@ async function deleteRoleHandler(
     if (assignedUsersCount > 0) {
       return errorResponse(
         `Cannot delete role because it is currently assigned to ${assignedUsersCount} active user(s). Reassign them first.`,
+        400
+      );
+    }
+
+    // ...or used as a project role
+    const linkedMembersCount = await ProjectMember.countDocuments({ organizationId, roleId: id, isDeleted: false });
+    if (linkedMembersCount > 0) {
+      return errorResponse(
+        `Cannot delete role because ${linkedMembersCount} project member(s) use it as their project role. Change their project role first.`,
         400
       );
     }

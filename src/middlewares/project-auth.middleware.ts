@@ -3,12 +3,13 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { withAuth } from '@/middlewares/auth.middleware';
 import { connectDB } from '@/lib/db';
-import { ProjectMember } from '@/models/project-member.model';
-import { forbiddenResponse, notFoundResponse } from '@/lib/api-response';
+import { User } from '@/models/user.model';
+import { forbiddenResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import type { ModuleName, PermissionAction } from '@/models/role.model';
+import { can } from '@/lib/rbac';
 
 /**
  * Middleware that checks project-level permissions for the current user.
@@ -29,48 +30,40 @@ export function withProjectPermission(
   handler: (req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) => Promise<Response>
 ) {
   return withAuth(async (req, context, auth) => {
-    // Super admin and org admin have full access everywhere
-    if (auth.systemRole === 'super_admin' || auth.systemRole === 'org_admin') {
-      return handler(req, context, auth);
-    }
-
-    await connectDB();
-    const organizationId = getOrganizationId(auth);
-
     // Extract projectId from route params
     const params = context?.params ? await context.params : ({} as Record<string, string>);
     const projectId = params.projectId;
 
-    if (!projectId) {
-      // If no projectId in the route, fall through to the handler
-      // (this middleware is only for project-scoped routes)
-      return handler(req, context, auth);
-    }
-
-    // Look up the user's membership in this project
-    const member = await ProjectMember.findOne({
-      projectId,
-      userId: auth.userId,
-      organizationId,
-      isDeleted: false,
-    });
-
-    if (!member) {
-      return forbiddenResponse('You are not a member of this project');
-    }
-
-    // Check if the member has the required permission
-    const permission = member.permissions?.find(
-      (p: { module: string }) => p.module === module
-    );
-
-    if (!permission || !permission.actions.includes(action)) {
+    // Admin, or a member of this project whose global + project role allows it (lib/rbac)
+    if (!(await can(auth, module, action, projectId))) {
       return forbiddenResponse(
-        `You don't have permission to ${action} ${module.replace('_', ' ')} in this project`
+        `You don't have permission to ${action} ${module.replace(/_/g, ' ')}${projectId ? ' in this project' : ''}`
       );
     }
 
     return handler(req, context, auth);
+  });
+}
+
+/**
+ * Like withProjectPermission, but any one of `modules` is enough — for lists a
+ * screen needs as supporting data (e.g. the Tasks screen reads the WBS tree,
+ * members for assignees, milestones and inventory with just Activity/Task: View).
+ */
+export function withAnyProjectPermission(
+  modules: ModuleName[],
+  action: PermissionAction,
+  handler: (req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) => Promise<Response>
+) {
+  return withAuth(async (req, context, auth) => {
+    const params = context?.params ? await context.params : ({} as Record<string, string>);
+    const projectId = params.projectId;
+    for (const module of modules) {
+      if (await can(auth, module, action, projectId)) return handler(req, context, auth);
+    }
+    return forbiddenResponse(
+      `You don't have permission to ${action} ${modules[0].replace(/_/g, ' ')}${projectId ? ' in this project' : ''}`
+    );
   });
 }
 
@@ -85,19 +78,14 @@ export async function checkProjectPermission(
   module: ModuleName,
   action: PermissionAction
 ): Promise<boolean> {
+  // Same rules as withProjectPermission (admin, global role, or project role)
   await connectDB();
-  const member = await ProjectMember.findOne({
-    projectId,
-    userId,
-    organizationId,
-    isDeleted: false,
-  });
-
-  if (!member) return false;
-
-  const permission = member.permissions?.find(
-    (p: { module: string }) => p.module === module
+  const user = await User.findById(userId).select('systemRole email');
+  if (!user) return false;
+  return can(
+    { userId, organizationId, systemRole: user.systemRole, email: user.email } as JwtPayload,
+    module,
+    action,
+    projectId
   );
-
-  return !!(permission && permission.actions.includes(action));
 }

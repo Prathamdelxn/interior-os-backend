@@ -51,7 +51,8 @@ export type ModuleName =
   // Sections that existed in the app but had no permission module yet
   | 'quotation'
   | 'inventory'
-  | 'templates';
+  | 'templates'
+  | 'confirm_order';
 
 export interface IPermission {
   module: ModuleName;
@@ -92,7 +93,7 @@ const PermissionSchema = new Schema<IPermission>(
         'settings', 'audit_logs', 'filemgt', 'financials',
         'crm_leads', 'crm_followups', 'crm_site_visits',
         'crm_requirements', 'crm_drawings', 'crm_boq', 'crm_quotations',
-        'quotation', 'inventory', 'templates',
+        'quotation', 'inventory', 'templates', 'confirm_order',
       ],
     },
     actions: [{
@@ -126,7 +127,7 @@ const RoleSchema = new Schema<IRole>(
     description: { type: String, trim: true, maxlength: 200 },
     permissions: [PermissionSchema],
     isSystem: { type: Boolean, default: false },
-    defaultsVersion: { type: Number, default: 1 },
+    defaultsVersion: { type: Number, default: 2 }, // lib/role-defaults DEFAULTS_VERSION
     isActive: { type: Boolean, default: true },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date },
@@ -156,6 +157,8 @@ RoleSchema.pre('findOne', function () {
   }
 });
 
+// Dev hot reload would keep the previously compiled schema (e.g. an old module enum)
+if (process.env.NODE_ENV !== 'production') delete mongoose.models.Role;
 export const Role: Model<IRole> =
   mongoose.models.Role || mongoose.model<IRole>('Role', RoleSchema);
 
@@ -170,7 +173,7 @@ export const ALL_MODULES: ModuleName[] = [
   'settings', 'audit_logs', 'filemgt', 'financials',
   'crm_leads', 'crm_followups', 'crm_site_visits',
   'crm_requirements', 'crm_drawings', 'crm_boq', 'crm_quotations',
-  'quotation', 'inventory', 'templates',
+  'quotation', 'inventory', 'templates', 'confirm_order',
 ];
 const allModules = ALL_MODULES;
 

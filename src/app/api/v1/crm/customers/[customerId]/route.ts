@@ -72,6 +72,7 @@ const updateCustomerSchema = z.object({
   remarks: z.string().trim().max(1000, 'Remarks cannot exceed 1000 characters').optional(),
   lostReason: z.string().optional(),
   linkedProject: z.string().optional(),
+  confirmedOrder: z.any().optional(),
 });
 
 // GET: Retrieve a single customer lead with full details

@@ -81,6 +81,7 @@ const STAGE_FIELDS: Record<string, ModuleName> = {
   designFiles: 'crm_drawings',
   boqs: 'crm_boq',
   quotations: 'crm_quotations',
+  confirmedOrder: 'crm_quotations',
   futureFollowUpDate: 'crm_followups',
 };
 

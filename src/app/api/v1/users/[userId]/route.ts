@@ -20,6 +20,7 @@ const updateUserSchema = z.object({
   email: z.string().email('Valid email is required').optional(),
   password: z.string().min(8, 'Password must be at least 8 characters').optional(),
   phone: z.string().optional(),
+  avatar: z.string().optional(),
   designation: z.string().optional(),
   department: z.string().optional(),
   role: z.string().optional(),
@@ -55,13 +56,15 @@ async function getUserHandler(req: NextRequest, context: { params: Promise<Recor
 // PATCH /api/v1/users/[userId] — Update user details
 async function updateUserHandler(req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) {
   try {
-    if (auth.systemRole !== 'super_admin' && auth.systemRole !== 'org_admin') {
-      return forbiddenResponse('Only organization admins can update users');
-    }
-
     await connectDB();
     const organizationId = getOrganizationId(auth);
     const { userId } = await context.params;
+    const isAdmin = auth.systemRole === 'super_admin' || auth.systemRole === 'org_admin';
+    const isSelf = String(userId) === String(auth.userId);
+    // Admins manage everyone; anyone may edit their own profile details (Settings → Profile)
+    if (!isAdmin && !isSelf) {
+      return forbiddenResponse('Only organization admins can update users');
+    }
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return errorResponse('Invalid user ID', 400);
@@ -78,7 +81,13 @@ async function updateUserHandler(req: NextRequest, context: { params: Promise<Re
       return errorResponse(validation.error.issues[0].message, 400);
     }
 
-    const { firstName, lastName, email, password, phone, designation, department, role, systemRole, status } = validation.data;
+    const { firstName, lastName, email, password, phone, avatar, designation, department, role, systemRole, status } = validation.data;
+
+    // Your own profile: name, phone, designation and department only — email, password
+    // (Settings → Change password), role, system role and status stay admin-only
+    if (!isAdmin && (email !== undefined || password !== undefined || role !== undefined || systemRole !== undefined || status !== undefined)) {
+      return forbiddenResponse('Only organization admins can change email, role or status');
+    }
 
     // Check unique email if email is being changed
     if (email && email.toLowerCase() !== user.email.toLowerCase()) {
@@ -111,6 +120,7 @@ async function updateUserHandler(req: NextRequest, context: { params: Promise<Re
     if (firstName) user.firstName = firstName;
     if (lastName) user.lastName = lastName;
     if (phone !== undefined) user.phone = phone;
+    if (avatar !== undefined) user.avatar = avatar;
     if (designation !== undefined) user.designation = designation;
     if (department !== undefined) user.department = department;
     if (systemRole) user.systemRole = systemRole;

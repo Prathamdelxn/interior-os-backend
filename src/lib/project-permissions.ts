@@ -45,10 +45,13 @@ export const PROJECT_MODULES: { module: ModuleName; label: string }[] = [
   { module: 'inventory', label: 'Inventory' },
   { module: 'change_requests', label: 'Change Requests' },
   { module: 'variation_orders', label: 'Variation Orders' },
+  { module: 'confirm_order', label: 'Confirm Order' },
 ];
 
 /** Modules added to the presets after members were already created (see roles/sync-defaults). */
 export const LATE_PROJECT_MODULES: ModuleName[] = ['boq', 'quotation', 'inventory', 'change_requests', 'variation_orders'];
+/** Added in defaults version 2. */
+export const V2_PROJECT_MODULES: ModuleName[] = ['confirm_order'];
 
 // ── Default permission presets per project role ──────────────────────────────
 
@@ -90,6 +93,7 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('inventory', full),
     perm('change_requests', full),
     perm('variation_orders', full),
+    perm('confirm_order', ['read', 'update']),
   ],
 
   // ── Site Engineer: Field-focused CRUD + own tasks ──
@@ -119,6 +123,7 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('inventory', crud),
     perm('change_requests', raise),
     perm('variation_orders', readOnly),
+    perm('confirm_order', readOnly),
   ],
 
   // ── Quantity Surveyor: Procurement/POs/Utilities focused ──
@@ -148,6 +153,7 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('inventory', crud),
     perm('change_requests', readOnly),
     perm('variation_orders', crud),
+    perm('confirm_order', ['read', 'update']),
   ],
 
   // ── Designer: Drawings/RFIs/Photos focused ──
@@ -214,6 +220,7 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('quotation', readOnly),
     perm('change_requests', ['create', 'read']),
     perm('variation_orders', readOnly),
+    perm('confirm_order', readOnly),
   ],
 
   // ── Viewer: Read-only everywhere ──
@@ -243,6 +250,7 @@ export const DEFAULT_PROJECT_PERMISSIONS: Record<ProjectRole, IPermission[]> = {
     perm('inventory', readOnly),
     perm('change_requests', readOnly),
     perm('variation_orders', readOnly),
+    perm('confirm_order', readOnly),
   ],
 };
 

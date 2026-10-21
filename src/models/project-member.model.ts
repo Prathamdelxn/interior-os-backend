@@ -38,7 +38,7 @@ const MemberPermissionSchema = new Schema(
         'settings', 'audit_logs', 'filemgt', 'financials',
         'crm_leads', 'crm_followups', 'crm_site_visits',
         'crm_requirements', 'crm_drawings', 'crm_boq', 'crm_quotations',
-        'quotation', 'inventory', 'templates',
+        'quotation', 'inventory', 'templates', 'confirm_order',
       ],
     },
     actions: [{
@@ -82,7 +82,7 @@ const ProjectMemberSchema = new Schema<IProjectMember>(
       type: [MemberPermissionSchema],
       default: [],
     },
-    defaultsVersion: { type: Number, default: 1 },
+    defaultsVersion: { type: Number, default: 2 }, // lib/role-defaults DEFAULTS_VERSION
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date },
   },
@@ -109,6 +109,8 @@ ProjectMemberSchema.pre('findOne', function () {
   }
 });
 
+// Dev hot reload would keep the previously compiled schema (e.g. an old module enum)
+if (process.env.NODE_ENV !== 'production') delete mongoose.models.ProjectMember;
 export const ProjectMember: Model<IProjectMember> =
   mongoose.models.ProjectMember || mongoose.model<IProjectMember>('ProjectMember', ProjectMemberSchema);
 

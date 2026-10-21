@@ -252,6 +252,9 @@ export interface ICrmCustomer extends Document {
 
   createdBy: mongoose.Types.ObjectId;
   linkedProject?: mongoose.Types.ObjectId;
+  // Confirmed order (accepted quote's vendor quotations, attachments…) — project Confirm Order tab
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  confirmedOrder?: any;
 
   createdAt: Date;
   updatedAt: Date;
@@ -562,6 +565,7 @@ const CrmCustomerSchema = new Schema<ICrmCustomer>(
 
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     linkedProject: { type: Schema.Types.ObjectId, ref: 'Project' },
+    confirmedOrder: { type: Schema.Types.Mixed },
   },
   {
     timestamps: true,

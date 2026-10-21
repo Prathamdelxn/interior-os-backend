@@ -134,6 +134,26 @@ async function updateCustomerHandler(
       return errorResponse('Customer not found', 404);
     }
 
+    // An approved BOQ version is final — changes go into a new version
+    if (Array.isArray(validation.data.boqs)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const strip = (v: any): any =>
+        Array.isArray(v) ? v.map(strip)
+        : v && typeof v === 'object' && !(v instanceof Date)
+          ? Object.fromEntries(Object.entries(v).filter(([k]) => !['_id', 'id', 'createdAt', 'updatedAt'].includes(k)).map(([k, x]) => [k, strip(x)]))
+          : v;
+      const before = JSON.parse(JSON.stringify(existing.toObject().boqs || []));
+      const after = JSON.parse(JSON.stringify(validation.data.boqs));
+      // (removing versions shifts the list — that's a delete, checked by permission)
+      const editedApproved = after.length >= before.length && before.some(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (b: any, i: number) => b?.status === 'approved' && after[i] && JSON.stringify(strip(after[i])) !== JSON.stringify(strip(b))
+      );
+      if (editedApproved) {
+        return errorResponse('An approved BOQ can’t be edited — create a new version instead', 400);
+      }
+    }
+
     // Each CRM stage has its own permission (site visit, requirements, drawings, BOQ, quotation…)
     const access = await canUpdateCustomer(auth, existing.toObject() as unknown as Record<string, unknown>, validation.data as Record<string, unknown>);
     if (!access.ok) {
@@ -246,7 +266,10 @@ async function updateCustomerHandler(
 }
 
 export const GET = withAnyPermission(CRM_MODULES, 'read', getSingleCustomerHandler);
-export const PATCH = withAnyPermission(CRM_MODULES, 'update', updateCustomerHandler);
+// Checked inside (canUpdateCustomer): stage moves need Create or Update on the stage,
+// stage data its own action, lead details Leads → Update. A role with only Create on a
+// stage must get through, so no blanket "Update on some CRM stage" check here.
+export const PATCH = withAuth(updateCustomerHandler);
 
 // DELETE: Delete a Customer Lead
 async function deleteCustomerHandler(

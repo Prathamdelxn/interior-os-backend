@@ -102,8 +102,13 @@ async function createActivityHandler(req: NextRequest, _context: any, auth: JwtP
     const validData = validation.data;
 
     const activityModule = crmModuleForActivityType(validData.type);
-    if (activityModule && !(await canAny(auth, [activityModule], 'create'))) {
+    // New activity in a stage: Create there, or Update (e.g. rescheduling a session already in the stage)
+    if (activityModule && !(await canAny(auth, [activityModule], 'create')) && !(await canAny(auth, [activityModule], 'update'))) {
       return forbiddenResponse(crmDeniedMessage(activityModule, 'create'));
+    }
+    // Automatic logs (status change / system update) ride along with a stage action
+    if (!activityModule && !(await canAny(auth, CRM_MODULES, 'create')) && !(await canAny(auth, CRM_MODULES, 'update'))) {
+      return forbiddenResponse("You don't have permission to log CRM activity");
     }
 
     // If creating a new pending activity or site visit, complete any existing pending activities for this customer
@@ -166,4 +171,5 @@ async function createActivityHandler(req: NextRequest, _context: any, auth: JwtP
 }
 
 export const GET = withAnyPermission(CRM_MODULES, 'read', getActivitiesHandler);
-export const POST = withAnyPermission(CRM_MODULES, 'create', createActivityHandler);
+// Checked inside: Create or Update on the activity's stage (automatic logs: on any stage)
+export const POST = withAuth(createActivityHandler);

@@ -86,7 +86,7 @@ const STAGE_FIELDS: Record<string, ModuleName> = {
 };
 
 // Lists where adding / removing an entry is a create / delete (BOQ versions, quotations, design files)
-const LIST_FIELDS = new Set(['boqs', 'quotations', 'designs', 'designFiles']);
+const LIST_FIELDS = new Set(['boqs', 'quotations', 'designs', 'designFiles', 'requirements']);
 
 // Notes that travel with any stage form
 const SHARED_FIELDS = new Set(['remarks', 'status']);
@@ -100,12 +100,21 @@ function actionForField(key: string, before: unknown, after: unknown): Permissio
   const prev = Array.isArray(before) ? before : [];
   const next = Array.isArray(after) ? after : [];
   if (next.length > prev.length) return 'create';
-  if (next.length < prev.length) return 'delete';
+  // Requirements have no Delete permission — removing a row is part of editing them
+  if (next.length < prev.length) return key === 'requirements' ? 'update' : 'delete';
   if (key === 'boqs') {
     // A BOQ version moving to approved / rejected is an approval decision
     const decided = next.some((b: any, i: number) => {
       const was = (prev[i] as any)?.status;
       return b?.status !== was && (b?.status === 'approved' || b?.status === 'rejected');
+    });
+    if (decided) return 'approve';
+  }
+  if (key === 'quotations') {
+    // Marking a quotation client-approved (Accepted) or Rejected is an approval decision
+    const decided = next.some((q: any, i: number) => {
+      const was = (prev[i] as any)?.status;
+      return q?.status !== was && (q?.status === 'Accepted' || q?.status === 'Rejected');
     });
     if (decided) return 'approve';
   }

@@ -53,6 +53,7 @@ const updateTaskSchema = z.object({
   // null / '' clears the date (the edit form sends null when a date is left empty)
   startDate: z.string().nullable().optional().transform((val) => (val === null || val === '' ? null : val ? new Date(val) : undefined)),
   endDate: z.string().nullable().optional().transform((val) => (val === null || val === '' ? null : val ? new Date(val) : undefined)),
+  completedAt: z.string().nullable().optional().transform((val) => (val === null || val === '' ? null : val ? new Date(val) : undefined)),
   assignees: z.array(z.string()).optional(),
   progress: z.number().min(0).max(100).optional(),
   dependencies: z.array(z.string()).optional(),
@@ -241,6 +242,17 @@ async function updateTaskHandler(req: NextRequest, context: { params: Promise<Re
       // If status changed to completed and progress not passed
       if (updateData.status === 'completed' && updateData.progress === undefined) {
         updateData.progress = 100;
+      }
+    }
+
+    // Auto-manage completedAt timestamp
+    if (updateData.status === 'completed') {
+      if (!updateData.completedAt && !existingTask.completedAt) {
+        updateData.completedAt = new Date();
+      }
+    } else if (updateData.status && updateData.status !== 'completed') {
+      if (updateData.completedAt === undefined) {
+        updateData.completedAt = null;
       }
     }
 

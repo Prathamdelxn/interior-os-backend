@@ -39,6 +39,7 @@ async function handler(_req: NextRequest, _context: { params: Promise<Record<str
         firstName: user.firstName,
         lastName: user.lastName,
         fullName: user.fullName,
+        name: user.fullName || `${user.firstName} ${user.lastName}`.trim(),
         avatar: user.avatar,
         phone: user.phone,
         designation: user.designation,

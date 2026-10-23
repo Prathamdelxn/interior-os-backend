@@ -119,6 +119,7 @@ export interface ITask extends Document {
   subtasks: ISubtask[];
   completionProof?: ICompletionProof;
   isMilestone?: boolean;
+  completedAt?: Date;
   isDeleted: boolean;
   deletedAt?: Date;
   createdAt: Date;
@@ -194,6 +195,7 @@ const TaskSchema = new Schema<ITask>(
     subtasks: { type: [SubtaskSchema], default: [] },
     completionProof: { type: CompletionProofSchema, default: null },
     isMilestone: { type: Boolean, default: false, index: true },
+    completedAt: Date,
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: Date,
   },

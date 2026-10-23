@@ -172,8 +172,8 @@ export async function signup(input: SignupInput) {
 export async function login(input: LoginInput, deviceInfo?: { userAgent?: string; ip?: string }) {
   await connectDB();
 
-  // Find user with password
-  const user = await User.findOne({ email: input.email }).select('+password');
+  // Find user with password and populate role
+  const user = await User.findOne({ email: input.email }).select('+password').populate('role');
   if (!user) {
     throw new AppError('Invalid email or password', 401);
   }
@@ -233,7 +233,10 @@ export async function login(input: LoginInput, deviceInfo?: { userAgent?: string
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      fullName: user.fullName || `${user.firstName} ${user.lastName}`.trim(),
+      name: user.fullName || `${user.firstName} ${user.lastName}`.trim(),
       avatar: user.avatar,
+      role: user.role,
       systemRole: user.systemRole,
       status: user.status,
       isEmailVerified: user.isEmailVerified,
@@ -361,7 +364,7 @@ export async function verifyEmail(email: string, otp: string) {
     email: email.toLowerCase(),
     emailVerificationToken: otp,
     emailVerificationExpiry: { $gt: new Date() },
-  }).select('+emailVerificationToken +emailVerificationExpiry');
+  }).select('+emailVerificationToken +emailVerificationExpiry').populate('role');
 
   if (!user) {
     throw new AppError('Invalid or expired OTP', 400);
@@ -397,7 +400,10 @@ export async function verifyEmail(email: string, otp: string) {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      fullName: user.fullName || `${user.firstName} ${user.lastName}`.trim(),
+      name: user.fullName || `${user.firstName} ${user.lastName}`.trim(),
       avatar: user.avatar,
+      role: user.role,
       systemRole: user.systemRole,
       status: user.status,
       isEmailVerified: user.isEmailVerified,

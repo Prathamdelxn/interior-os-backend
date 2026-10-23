@@ -27,6 +27,7 @@ const createTaskSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
   startDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
   endDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
+  completedAt: z.string().optional().transform((val) => val ? new Date(val) : undefined),
   assignees: z.array(z.string()).optional().default([]),
   dependencies: z.array(z.string()).optional().default([]),
   subtasks: z.array(subtaskInputSchema).optional().default([]),
@@ -187,6 +188,7 @@ async function createTaskHandler(req: NextRequest, context: { params: Promise<Re
       ...data,
       status: initialStatus,
       progress: computedProgress,
+      completedAt: initialStatus === 'completed' ? (data.completedAt || new Date()) : undefined,
       projectId,
       organizationId,
     });

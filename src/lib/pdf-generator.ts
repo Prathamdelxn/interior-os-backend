@@ -284,29 +284,28 @@ export async function generateQuotationPdfBuffer(
       const discount = Number(quotation.discount || 0);
       const grandTotal = Number(quotation.grandTotal || 0);
 
-      // Terms & Notes Box on left
-      const notesBoxWidth = 260;
-      doc
-        .rect(leftMargin, currentY, notesBoxWidth, 75)
-        .fillAndStroke('#f8fafc', '#e2e8f0');
+      // Optional Notes Box on left (only if notes are provided)
+      if (quotation.notes && quotation.notes.trim()) {
+        const notesBoxWidth = 260;
+        doc
+          .rect(leftMargin, currentY, notesBoxWidth, 75)
+          .fillAndStroke('#f8fafc', '#e2e8f0');
 
-      doc
-        .fillColor('#64748b')
-        .fontSize(7.5)
-        .font('Helvetica-Bold')
-        .text('TERMS & CONDITIONS', leftMargin + 10, currentY + 8);
+        doc
+          .fillColor('#64748b')
+          .fontSize(7.5)
+          .font('Helvetica-Bold')
+          .text('NOTES & REMARKS', leftMargin + 10, currentY + 8);
 
-      const termsText = quotation.notes?.trim() ||
-        '1. Validity: 15 days from issue date.\n2. Payment: As per approved project milestones.\n3. Taxes & statutory levies applicable as shown.';
-
-      doc
-        .fillColor('#475569')
-        .fontSize(7.5)
-        .font('Helvetica')
-        .text(termsText.slice(0, 200), leftMargin + 10, currentY + 20, {
-          width: notesBoxWidth - 20,
-          lineGap: 2,
-        });
+        doc
+          .fillColor('#475569')
+          .fontSize(7.5)
+          .font('Helvetica')
+          .text(quotation.notes.trim().slice(0, 200), leftMargin + 10, currentY + 20, {
+            width: notesBoxWidth - 20,
+            lineGap: 2,
+          });
+      }
 
       // Totals Box on right
       const totalsLeft = leftMargin + 280;

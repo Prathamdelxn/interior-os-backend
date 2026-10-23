@@ -8,6 +8,7 @@ import { CRM_MODULES, canUpdateCustomer, crmDeniedMessage } from '@/lib/crm-acce
 import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { CrmActivity } from '@/models/crm-activity.model';
+import { User } from '@/models/user.model';
 import { successResponse, errorResponse, serverErrorResponse, forbiddenResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import mongoose from 'mongoose';
@@ -152,6 +153,23 @@ async function updateCustomerHandler(
       if (editedApproved) {
         return errorResponse('An approved BOQ can’t be edited — create a new version instead', 400);
       }
+
+      const currentUser = await User.findById(auth.userId).select('firstName lastName email');
+      const currentUserName = currentUser
+        ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email
+        : 'Team';
+
+      validation.data.boqs = validation.data.boqs.map((b: any, i: number) => {
+        const existingBoq = existing.boqs?.[i];
+        return {
+          ...b,
+          createdAt: b.createdAt || existingBoq?.createdAt || new Date(),
+          createdBy: b.createdBy || existingBoq?.createdBy || auth.userId,
+          createdByName: b.createdByName || existingBoq?.createdByName || currentUserName,
+          createdByEmail: b.createdByEmail || existingBoq?.createdByEmail || currentUser?.email,
+          ...(existingBoq ? { updatedAt: new Date(), updatedBy: auth.userId, updatedByName: currentUserName } : {}),
+        };
+      });
     }
 
     // Each CRM stage has its own permission (site visit, requirements, drawings, BOQ, quotation…)

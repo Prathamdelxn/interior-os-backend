@@ -169,6 +169,12 @@ export interface IBoqVersion {
   isUnpriced?: boolean;
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
   createdAt?: Date;
+  createdBy?: mongoose.Types.ObjectId;
+  createdByName?: string;
+  createdByEmail?: string;
+  updatedAt?: Date;
+  updatedBy?: mongoose.Types.ObjectId;
+  updatedByName?: string;
   notes?: string;
 }
 
@@ -456,6 +462,12 @@ const CustomerBoqSchema = new Schema(
     isUnpriced: { type: Boolean, default: false },
     status: { type: String, enum: ['draft', 'pending_approval', 'approved', 'rejected'], default: 'draft' },
     createdAt: { type: Date, default: Date.now },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    createdByName: String,
+    createdByEmail: String,
+    updatedAt: Date,
+    updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    updatedByName: String,
     notes: String,
     assignedReviewer: { type: Schema.Types.ObjectId, ref: 'User' },
     assignedReviewerName: String,

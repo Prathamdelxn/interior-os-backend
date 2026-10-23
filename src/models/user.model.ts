@@ -13,6 +13,7 @@ export interface IUser extends Document {
   firstName: string;
   lastName: string;
   fullName: string;
+  name?: string;
   avatar?: string;
   phone?: string;
   designation?: string;
@@ -142,9 +143,13 @@ UserSchema.index({ organizationId: 1, status: 1 });
 UserSchema.index({ organizationId: 1, systemRole: 1 });
 UserSchema.index({ firstName: 'text', lastName: 'text', email: 'text' });
 
-// Virtual: fullName
+// Virtual: fullName & name
 UserSchema.virtual('fullName').get(function (this: IUser) {
-  return `${this.firstName} ${this.lastName}`;
+  return `${this.firstName} ${this.lastName}`.trim();
+});
+
+UserSchema.virtual('name').get(function (this: IUser) {
+  return `${this.firstName} ${this.lastName}`.trim();
 });
 
 // Pre-save: Hash password

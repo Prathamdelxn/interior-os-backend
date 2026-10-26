@@ -10,7 +10,7 @@ export interface IProject extends Document {
   name: string;
   code: string;
   client: string;
-  type: 'Commercial Office' | 'Residential' | 'Tech Office' | 'General';
+  type: 'Commercial Office' | 'Residential' | 'Tech Office' | 'Co-working Space' | 'General';
   status: 'active' | 'inactive' | 'completed' | 'on-hold';
   startDate: Date;
   endDate: Date;
@@ -58,7 +58,7 @@ const ProjectSchema = new Schema<IProject>(
     },
     type: {
       type: String,
-      enum: ['Commercial Office', 'Residential', 'Tech Office', 'General'],
+      enum: ['Commercial Office', 'Residential', 'Tech Office', 'Co-working Space', 'General'],
       default: 'General',
     },
     status: {

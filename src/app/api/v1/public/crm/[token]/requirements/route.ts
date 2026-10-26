@@ -49,9 +49,12 @@ export async function POST(
     await customer.save();
 
     // Log Activity in CRM for team notification
+    // Activities need a user: the client has no account, so log it under the
+    // lead's owner (sales executive → designer → creator)
     await CrmActivity.create({
       organizationId: customer.organizationId,
       customer: customer._id,
+      user: customer.assignedSalesExecutive || customer.designerAssigned || customer.createdBy,
       type: 'Requirement Gathering',
       status: 'Completed',
       remarks: `Client (${customer.name}) submitted ${requirements.length} space requirement(s) via Client Portal.${notes ? ' Notes: "' + notes + '"' : ''}`,

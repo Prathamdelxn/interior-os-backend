@@ -72,7 +72,28 @@ async function getFilesHandler(
       breadcrumbs = await getBreadcrumbs(parentId, organizationId);
     }
 
-    return successResponse({ items, breadcrumbs });
+    // Number of (non-deleted) files and sub-folders directly inside each folder
+    const folderIds = items.filter((it: any) => it.type === 'folder').map((it: any) => it._id);
+    const countMap = new Map<string, number>();
+    if (folderIds.length > 0) {
+      const counts = await ProjectFile.aggregate([
+        {
+          $match: {
+            parentId: { $in: folderIds },
+            organizationId: new mongoose.Types.ObjectId(String(organizationId)),
+            isDeleted: false,
+          },
+        },
+        { $group: { _id: '$parentId', count: { $sum: 1 } } },
+      ]);
+      counts.forEach((c: any) => countMap.set(String(c._id), c.count));
+    }
+    const itemsWithCounts = items.map((it: any) => {
+      const obj = it.toObject();
+      return it.type === 'folder' ? { ...obj, itemCount: countMap.get(String(it._id)) || 0 } : obj;
+    });
+
+    return successResponse({ items: itemsWithCounts, breadcrumbs });
   } catch (error) {
     console.error('GET filemgt error:', error);
     return serverErrorResponse();

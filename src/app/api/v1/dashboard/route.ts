@@ -192,35 +192,37 @@ async function getGlobalDashboardHandler(req: NextRequest, _context: any, auth: 
 
     const activeProjectIds = activeProjects.map(p => p._id);
     const allActiveTasks = activeProjectIds.length > 0
-      ? await Task.find({ projectId: { $in: activeProjectIds }, isDeleted: false }).select('projectId progress').lean()
+      ? await Task.find({ projectId: { $in: activeProjectIds }, isDeleted: false })
+          .select('projectId progress status endDate completedAt updatedAt')
+          .lean()
       : [];
 
+    // Real month-end figures across active projects' activities:
+    //   planned = % of activities due by that month's end
+    //   actual  = % of activities completed by then (this month: live progress)
     const progressTrendData = [];
     if (allActiveTasks.length > 0) {
-      const projectTaskMap = new Map<string, number[]>();
-      for (const t of allActiveTasks) {
-        const pid = String(t.projectId);
-        if (!projectTaskMap.has(pid)) projectTaskMap.set(pid, []);
-        projectTaskMap.get(pid)!.push(t.progress || 0);
-      }
-
-      let avgActual = 0;
-      let count = 0;
-      for (const progresses of projectTaskMap.values()) {
-        const avg = progresses.reduce((s, p) => s + p, 0) / progresses.length;
-        avgActual += avg;
-        count++;
-      }
-      avgActual = count > 0 ? Math.round(avgActual / count) : 0;
-      const avgPlanned = Math.min(100, avgActual + 8);
+      const total = allActiveTasks.length;
+      const doneAt = (t: any): Date | null =>
+        t.status === 'completed' ? new Date(t.completedAt || t.updatedAt || now) : null;
 
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const scale = (6 - i) / 6;
+        const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+        const isCurrentMonth = i === 0;
+
+        const plannedDone = allActiveTasks.filter((t: any) => t.endDate && new Date(t.endDate) <= monthEnd).length;
+        const actualPct = isCurrentMonth
+          ? allActiveTasks.reduce((s: number, t: any) => s + (t.status === 'completed' ? 100 : t.progress || 0), 0) / total
+          : (allActiveTasks.filter((t: any) => {
+              const dt = doneAt(t);
+              return dt && dt <= monthEnd;
+            }).length / total) * 100;
+
         progressTrendData.push({
           month: months[d.getMonth()],
-          planned: Math.round(avgPlanned * scale),
-          actual: Math.round(avgActual * scale),
+          planned: Math.round((plannedDone / total) * 100),
+          actual: Math.round(actualPct),
         });
       }
     } else {

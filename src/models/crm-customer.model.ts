@@ -241,6 +241,9 @@ export interface ICrmCustomer extends Document {
   sitePhotos: string[];
 
   requirements: IRequirement[];
+  clientRequirements?: IRequirement[];
+  clientRequirementsSubmittedAt?: Date;
+  clientRequirementsNotes?: string;
   drawingHandoverNotes?: string;
   designFiles: IDesignFile[];
   boqs: IBoqVersion[];
@@ -560,6 +563,9 @@ const CrmCustomerSchema = new Schema<ICrmCustomer>(
     sitePhotos: [{ type: String }],
 
     requirements: [RequirementSchema],
+    clientRequirements: [RequirementSchema],
+    clientRequirementsSubmittedAt: { type: Date },
+    clientRequirementsNotes: { type: String },
     drawingHandoverNotes: { type: String },
     designFiles: [DesignFileSchema],
     boqs: [CustomerBoqSchema],

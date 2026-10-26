@@ -113,6 +113,9 @@ export async function GET(
       },
       designFiles: approvedDesignFiles,
       requirements: customer.shareSettings?.includeRequirements ? (customer.requirements || []) : [],
+      clientRequirements: customer.clientRequirements || [],
+      clientRequirementsSubmittedAt: customer.clientRequirementsSubmittedAt || null,
+      clientRequirementsNotes: customer.clientRequirementsNotes || "",
       permissions: {
         allowDownload: customer.shareSettings?.allowDownload ?? false,
         expiresAt: customer.shareSettings?.expiresAt || null,

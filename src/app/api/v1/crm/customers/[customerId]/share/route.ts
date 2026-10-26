@@ -36,30 +36,35 @@ async function generateShareLinkHandler(
       return errorResponse('Customer/Lead not found', 404);
     }
 
-    // Disallow creating a share link if no drawing has been approved
-    const designFiles = customer.designFiles || [];
-    const hasApprovedDrawing = designFiles.some((d: any) => {
-      const versions = d.versions || [];
-      const latestVersion = versions.length > 0 ? versions[versions.length - 1] : null;
-      const status = d.status || d.approvalStatus || latestVersion?.approvalStatus;
-      const isStatusApproved = ['internally_approved', 'client_approved', 'approved'].includes(status);
-      const hasApprovedVersion = versions.some((v: any) => v.approvalStatus === 'internally_approved' || v.approvalStatus === 'approved');
-      const isChangesRequested = d.clientStatus === 'client_changes_requested' || latestVersion?.clientStatus === 'client_changes_requested';
-      return (isStatusApproved || hasApprovedVersion) && !isChangesRequested;
-    });
-
-    if (!hasApprovedDrawing) {
-      return errorResponse('Cannot create a share link: At least one drawing must be approved before sharing with the client.', 400);
-    }
-
     const body = await req.json().catch(() => ({}));
     const {
       expiresDays,
       expiresHours,
       allowDownload = false,
-      includeRequirements = true,
+      includeRequirements = false,
       regenerate = false,
+      mode = 'drawings',
     } = body;
+
+    const isRequirementsMode = mode === 'requirements' || includeRequirements === true;
+
+    // Disallow creating a drawing share link if no drawing has been approved (only when sharing exclusively for drawings)
+    if (!isRequirementsMode) {
+      const designFiles = customer.designFiles || [];
+      const hasApprovedDrawing = designFiles.some((d: any) => {
+        const versions = d.versions || [];
+        const latestVersion = versions.length > 0 ? versions[versions.length - 1] : null;
+        const status = d.status || d.approvalStatus || latestVersion?.approvalStatus;
+        const isStatusApproved = ['internally_approved', 'client_approved', 'approved'].includes(status);
+        const hasApprovedVersion = versions.some((v: any) => v.approvalStatus === 'internally_approved' || v.approvalStatus === 'approved');
+        const isChangesRequested = d.clientStatus === 'client_changes_requested' || latestVersion?.clientStatus === 'client_changes_requested';
+        return (isStatusApproved || hasApprovedVersion) && !isChangesRequested;
+      });
+
+      if (!hasApprovedDrawing) {
+        return errorResponse('Cannot create a drawings share link: At least one drawing must be approved before sharing drawings with the client.', 400);
+      }
+    }
 
     // Default to 1 hour if neither expiresHours nor expiresDays is provided
     const effectiveHours = expiresHours !== undefined ? expiresHours : (expiresDays !== undefined ? null : 1);

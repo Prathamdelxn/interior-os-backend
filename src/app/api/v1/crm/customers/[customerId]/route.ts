@@ -57,8 +57,8 @@ const updateCustomerSchema = z.object({
   propertyAddress: z.string().trim().max(300, 'Property address cannot exceed 300 characters').optional(),
   budgetRange: z.string().trim().max(100, 'Budget range cannot exceed 100 characters').optional(),
   status: z.string().optional(),
-  assignedSalesExecutive: z.string().optional(),
-  designerAssigned: z.string().optional(),
+  assignedSalesExecutive: z.any().optional().nullable(),
+  designerAssigned: z.any().optional().nullable(),
   priority: z.string().optional(),
   possessionDate: z.coerce.date().optional().nullable(),
   siteVisitScheduledDate: z.coerce.date().optional().nullable(),
@@ -66,6 +66,9 @@ const updateCustomerSchema = z.object({
   siteMeasurements: z.any().optional(),
   sitePhotos: z.array(z.string()).optional(),
   requirements: z.any().optional(),
+  clientRequirements: z.any().optional(),
+  clientRequirementsSubmittedAt: z.any().optional(),
+  clientRequirementsNotes: z.any().optional(),
   designs: z.array(z.any()).optional(),
   designFiles: z.array(z.any()).optional(),
   quotations: z.array(z.any()).optional(),
@@ -186,6 +189,13 @@ async function updateCustomerHandler(
       if (updateData.status && updateData.status !== existing.status) {
         delete updateData.status;
       }
+    }
+
+    if (typeof updateData.assignedSalesExecutive === 'object' && updateData.assignedSalesExecutive !== null) {
+      updateData.assignedSalesExecutive = updateData.assignedSalesExecutive._id || updateData.assignedSalesExecutive.id;
+    }
+    if (typeof updateData.designerAssigned === 'object' && updateData.designerAssigned !== null) {
+      updateData.designerAssigned = updateData.designerAssigned._id || updateData.designerAssigned.id;
     }
 
     if (updateData.assignedSalesExecutive === '' || updateData.assignedSalesExecutive === null) {

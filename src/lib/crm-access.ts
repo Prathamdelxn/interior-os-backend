@@ -12,8 +12,8 @@ import { canAny } from '@/lib/rbac';
 export const CRM_MODULES: ModuleName[] = [
   'crm_leads',
   'crm_followups',
-  'crm_site_visits',
   'crm_requirements',
+  'crm_site_visits',
   'crm_drawings',
   'crm_boq',
   'crm_quotations',

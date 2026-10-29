@@ -23,11 +23,17 @@ export async function POST(
 
     const customer = await CrmCustomer.findOne({
       'shareSettings.shareToken': token,
-      'shareSettings.isPublic': true,
     });
 
     if (!customer) {
-      return errorResponse('Requirement link is invalid or disabled', 404);
+      return errorResponse('Requirement link is invalid or does not exist', 404);
+    }
+
+    if (customer.shareSettings?.isPublic === false) {
+      if (customer.clientRequirementsSubmittedAt) {
+        return errorResponse('Requirements have already been submitted for this link. The link has been closed.', 403);
+      }
+      return errorResponse('This requirement share link has been disabled or stopped', 403);
     }
 
     if (customer.shareSettings?.expiresAt && new Date() > new Date(customer.shareSettings.expiresAt)) {
@@ -42,8 +48,13 @@ export async function POST(
     if (notes) {
       customer.clientRequirementsNotes = notes;
     }
-    if (budgetRange && !customer.budgetRange) {
+    if (budgetRange) {
       customer.budgetRange = budgetRange;
+    }
+
+    // Automatically stop / disable the sharing link once requirements are submitted
+    if (customer.shareSettings) {
+      customer.shareSettings.isPublic = false;
     }
 
     await customer.save();
@@ -57,7 +68,7 @@ export async function POST(
       user: customer.assignedSalesExecutive || customer.designerAssigned || customer.createdBy,
       type: 'Requirement Gathering',
       status: 'Completed',
-      remarks: `Client (${customer.name}) submitted ${requirements.length} space requirement(s) via Client Portal.${notes ? ' Notes: "' + notes + '"' : ''}`,
+      remarks: `Client (${customer.name}) submitted ${requirements.length} space requirement(s) via Client Portal. Link has been automatically disabled.${notes ? ' Notes: "' + notes + '"' : ''}`,
       completedDate: new Date(),
     }).catch(() => null);
 
@@ -65,6 +76,7 @@ export async function POST(
       message: 'Requirements submitted successfully! Your design team has been notified.',
       clientRequirements: customer.clientRequirements,
       clientRequirementsSubmittedAt: customer.clientRequirementsSubmittedAt,
+      shareSettings: customer.shareSettings,
     });
   } catch (error) {
     console.error('Error submitting client requirements:', error);

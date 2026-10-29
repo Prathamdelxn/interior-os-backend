@@ -66,8 +66,8 @@ async function generateShareLinkHandler(
       }
     }
 
-    // Default to 1 hour if neither expiresHours nor expiresDays is provided
-    const effectiveHours = expiresHours !== undefined ? expiresHours : (expiresDays !== undefined ? null : 1);
+    // Default to 168 hours (7 days) for requirements if neither expiresHours nor expiresDays is provided
+    const effectiveHours = expiresHours !== undefined ? expiresHours : (expiresDays !== undefined ? null : (isRequirementsMode ? 168 : 168));
 
     // Maintain existing token if valid and not asking for regenerate, else create new one
     let token = customer.shareSettings?.shareToken;
@@ -155,5 +155,52 @@ async function revokeShareLinkHandler(
   }
 }
 
+// GET: Retrieve public share link settings or token
+async function getShareLinkHandler(
+  req: NextRequest,
+  context: { params: Promise<Record<string, string>> },
+  auth: JwtPayload
+) {
+  try {
+    await connectDB();
+    const organizationId = getOrganizationId(auth);
+    const { customerId } = await context.params;
+
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+      return errorResponse('Invalid customer ID', 400);
+    }
+
+    let customer = await CrmCustomer.findOne({ _id: customerId, organizationId });
+    if (!customer) {
+      customer = await CrmCustomer.findById(customerId);
+    }
+    if (!customer) {
+      return errorResponse('Customer/Lead not found', 404);
+    }
+
+    if (!customer.shareSettings?.shareToken) {
+      const token = `cd_${crypto.randomBytes(16).toString('hex')}`;
+      customer.shareSettings = {
+        shareToken: token,
+        isPublic: true,
+        expiresAt: null,
+        allowDownload: false,
+        includeRequirements: true,
+        viewCount: 0,
+      };
+      await customer.save();
+    }
+
+    return successResponse({
+      shareToken: customer.shareSettings.shareToken,
+      shareSettings: customer.shareSettings,
+    });
+  } catch (error) {
+    console.error('Error fetching share link:', error);
+    return serverErrorResponse('Failed to fetch share link');
+  }
+}
+
+export const GET = withAnyPermission(CRM_MODULES, 'read', getShareLinkHandler);
 export const POST = withAnyPermission(CRM_MODULES, 'update', generateShareLinkHandler);
 export const DELETE = withAnyPermission(CRM_MODULES, 'update', revokeShareLinkHandler);

@@ -23,16 +23,22 @@ export async function GET(
 
     const customer = await CrmCustomer.findOne({
       'shareSettings.shareToken': token,
-      'shareSettings.isPublic': true,
     }).populate('organizationId', 'name logo email phone website');
 
     if (!customer) {
-      return errorResponse('Drawing share link is invalid or has been disabled.', 404);
+      return errorResponse('Drawing or requirement share link is invalid or does not exist.', 404);
+    }
+
+    if (customer.shareSettings?.isPublic === false) {
+      if (customer.clientRequirementsSubmittedAt) {
+        return errorResponse('Requirements have already been submitted for this link. The link has been closed.', 403);
+      }
+      return errorResponse('This share link has been stopped or disabled by the studio.', 403);
     }
 
     // Check expiration
     if (customer.shareSettings?.expiresAt && new Date() > new Date(customer.shareSettings.expiresAt)) {
-      return errorResponse('This drawing share link has expired.', 410);
+      return errorResponse('This share link has expired.', 410);
     }
 
     // Increment view count asynchronously
@@ -103,6 +109,7 @@ export async function GET(
         projectLocation: customer.projectLocation,
         city: customer.city,
         state: customer.state,
+        budgetRange: customer.budgetRange || '',
       },
       organization: {
         name: org?.name || 'SkyStruct Lite',

@@ -291,6 +291,57 @@ async function convertCustomerHandler(
       }
     }
 
+    // 3. Carry over site visit inspection photos if any
+    if (customer.sitePhotos && customer.sitePhotos.length > 0) {
+      try {
+        const { SitePhoto } = await import('@/models/site-photo.model');
+        const photoDocs = customer.sitePhotos.map((photoUrl: string, idx: number) => ({
+          organizationId,
+          projectId: project._id,
+          caption: `Site Survey Photo ${idx + 1} (${customer.leadNumber || 'CRM'})`,
+          category: 'other',
+          url: photoUrl,
+          uploadedBy: auth.userId,
+        }));
+        await SitePhoto.insertMany(photoDocs);
+      } catch (photoErr) {
+        console.warn('Failed to copy site photos to project:', photoErr);
+      }
+    }
+
+    // 4. Carry over / promote Client Intake Requirements to Requirements if empty
+    const hasExistingReqs = Array.isArray(customer.requirements) && customer.requirements.length > 0;
+    const hasClientReqs = Array.isArray(customer.clientRequirements) && customer.clientRequirements.length > 0;
+
+    if (!hasExistingReqs && Array.isArray(customer.clientRequirements) && customer.clientRequirements.length > 0) {
+      customer.requirements = customer.clientRequirements.map((cr: any) => ({
+        roomName: (cr.roomName || cr.name || cr.room || 'Space').trim(),
+        interiorType: cr.interiorType || cr.type || customer.propertyType || 'Residential',
+        theme: cr.theme || cr.designStyle || cr.style || '',
+        description: cr.description || cr.notes || cr.remarks || '',
+        roomUsage: cr.roomUsage || cr.usage || '',
+        furnitureRequirements: cr.furnitureRequirements || '',
+        storage: cr.storage || '',
+        electricalPoints: cr.electricalPoints || '',
+        lightingRequirements: cr.lightingRequirements || '',
+        plumbingRequirements: cr.plumbingRequirements || '',
+        circulation: cr.circulation || '',
+        designStyle: cr.designStyle || cr.style || cr.theme || '',
+        colours: cr.colours || cr.colors || '',
+        materials: cr.materials || '',
+        flooring: cr.flooring || '',
+        ceiling: cr.ceiling || '',
+        wallFinishes: cr.wallFinishes || '',
+        furnitureStyle: cr.furnitureStyle || '',
+        budget: cr.budget || '',
+        dimensions: cr.dimensions || '',
+        priority: cr.priority || 'Medium',
+        notes: cr.notes || '',
+        remarks: cr.remarks || '',
+      }));
+      customer.markModified('requirements');
+    }
+
     // Update Customer
     customer.status = 'Won';
     customer.linkedProject = project._id as mongoose.Types.ObjectId;

@@ -47,6 +47,11 @@ export interface IRequirement {
   ceiling?: string;
   wallFinishes?: string;
   furnitureStyle?: string;
+  budget?: string;
+  dimensions?: string;
+  priority?: string;
+  notes?: string;
+  remarks?: string;
 }
 
 export interface IDrawingVersion {
@@ -290,26 +295,34 @@ const SiteMeasurementsSchema = new Schema<ISiteMeasurements>(
   { _id: false }
 );
 
-const RequirementSchema = new Schema<IRequirement>({
-  roomName: String,
-  description: String,
-  theme: String,
-  interiorType: String,
-  roomUsage: String,
-  furnitureRequirements: String,
-  storage: String,
-  electricalPoints: String,
-  lightingRequirements: String,
-  plumbingRequirements: String,
-  circulation: String,
-  designStyle: String,
-  colours: String,
-  materials: String,
-  flooring: String,
-  ceiling: String,
-  wallFinishes: String,
-  furnitureStyle: String,
-});
+const RequirementSchema = new Schema<IRequirement>(
+  {
+    roomName: String,
+    description: String,
+    theme: String,
+    interiorType: String,
+    roomUsage: String,
+    furnitureRequirements: String,
+    storage: String,
+    electricalPoints: String,
+    lightingRequirements: String,
+    plumbingRequirements: String,
+    circulation: String,
+    designStyle: String,
+    colours: String,
+    materials: String,
+    flooring: String,
+    ceiling: String,
+    wallFinishes: String,
+    furnitureStyle: String,
+    budget: String,
+    dimensions: String,
+    priority: String,
+    notes: String,
+    remarks: String,
+  },
+  { _id: false, strict: false }
+);
 
 const DrawingVersionSchema = new Schema<IDrawingVersion>(
   {

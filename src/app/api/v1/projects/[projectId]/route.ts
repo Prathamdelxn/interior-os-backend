@@ -52,9 +52,13 @@ async function getProjectDetailsHandler(req: NextRequest, context: { params: Pro
     }
 
     let budgetObj = project.budget || { amount: 0, currency: 'INR' };
-    if (!budgetObj.amount || budgetObj.amount === 0) {
-      const c = await CrmCustomer.findOne({ organizationId, linkedProject: projectId }).select('quotations boqs budgetRange').lean();
-      if (c) {
+    const c = await CrmCustomer.findOne({ organizationId, linkedProject: projectId })
+      .populate('assignedSalesExecutive', 'firstName lastName email fullName avatar')
+      .populate('designerAssigned', 'firstName lastName email fullName avatar')
+      .lean();
+
+    if (c) {
+      if (!budgetObj.amount || budgetObj.amount === 0) {
         let bAmount = 0;
         if (c.quotations && c.quotations.length > 0) {
           const accepted: any = c.quotations.find((q: any) => q.status === 'Accepted' || q.status === 'Approved') || c.quotations[c.quotations.length - 1];
@@ -83,6 +87,8 @@ async function getProjectDetailsHandler(req: NextRequest, context: { params: Pro
       health: metrics.health,
       healthColor: metrics.healthColor,
       healthLabel: metrics.healthLabel,
+      linkedCustomerId: c?._id || null,
+      linkedCustomer: c || null,
     };
 
     return successResponse(enrichedProject);

@@ -98,6 +98,8 @@ async function getCustomersHandler(req: NextRequest, _context: any, auth: JwtPay
     const status = searchParams.get('status');
     const stage = searchParams.get('stage');
     const search = searchParams.get('search')?.trim();
+    const linkedProject = searchParams.get('linkedProject');
+    const includePhotos = searchParams.get('includePhotos') === 'true' || Boolean(linkedProject);
     const { page, limit, sort, order } = parsePaginationParams(searchParams);
     const skip = (page - 1) * limit;
 
@@ -106,6 +108,10 @@ async function getCustomersHandler(req: NextRequest, _context: any, auth: JwtPay
     // Direct Status filter
     if (status) {
       query.status = status;
+    }
+
+    if (linkedProject) {
+      query.linkedProject = linkedProject;
     }
 
     // Pipeline Stage Filter
@@ -191,8 +197,11 @@ async function getCustomersHandler(req: NextRequest, _context: any, auth: JwtPay
     const sortConfig: any = { [sort]: sortOrder };
 
     if (isAll) {
-      const customers = await CrmCustomer.find(query)
-        .select('-sitePhotos')
+      let queryBuilder = CrmCustomer.find(query);
+      if (!includePhotos) {
+        queryBuilder = queryBuilder.select('-sitePhotos');
+      }
+      const customers = await queryBuilder
         .populate('assignedSalesExecutive', 'firstName lastName email fullName')
         .populate('designerAssigned', 'firstName lastName email fullName')
         .sort(sortConfig)
@@ -202,10 +211,13 @@ async function getCustomersHandler(req: NextRequest, _context: any, auth: JwtPay
     }
 
     // High performance parallel execution
+    let listQueryBuilder = CrmCustomer.find(query);
+    if (!includePhotos) {
+      listQueryBuilder = listQueryBuilder.select('-sitePhotos');
+    }
     const [total, customers] = await Promise.all([
       CrmCustomer.countDocuments(query),
-      CrmCustomer.find(query)
-        .select('-sitePhotos')
+      listQueryBuilder
         .populate('assignedSalesExecutive', 'firstName lastName email fullName')
         .populate('designerAssigned', 'firstName lastName email fullName')
         .sort(sortConfig)

@@ -48,6 +48,7 @@ async function updateVendorHandler(req: NextRequest, context: { params: Promise<
     }
 
     if (body.name !== undefined) vendor.name = body.name.trim();
+    if (body.vendorCode !== undefined) vendor.vendorCode = body.vendorCode.trim();
     if (body.contactPerson !== undefined) vendor.contactPerson = body.contactPerson.trim();
     if (body.email !== undefined) vendor.email = body.email.trim();
     if (body.phoneNumber !== undefined) vendor.phoneNumber = body.phoneNumber.trim();

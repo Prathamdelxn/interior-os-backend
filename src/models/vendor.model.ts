@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IVendor extends Document {
+  vendorCode?: string;
   name: string;
   contactPerson?: string;
   email?: string;
@@ -21,6 +22,11 @@ export interface IVendor extends Document {
 
 const VendorSchema = new Schema<IVendor>(
   {
+    vendorCode: {
+      type: String,
+      trim: true,
+      index: true,
+    },
     name: {
       type: String,
       required: [true, 'Please provide a vendor name'],
@@ -71,4 +77,7 @@ const VendorSchema = new Schema<IVendor>(
   }
 );
 
+if (mongoose.models && mongoose.models.Vendor) {
+  delete (mongoose.models as any).Vendor;
+}
 export const Vendor = mongoose.models.Vendor || mongoose.model<IVendor>('Vendor', VendorSchema);

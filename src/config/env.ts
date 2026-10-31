@@ -60,7 +60,7 @@ export const env = {
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: getEnvNumber('RATE_LIMIT_WINDOW_MS', 60000),
   RATE_LIMIT_MAX_REQUESTS: getEnvNumber('RATE_LIMIT_MAX_REQUESTS', 100),
-
+//limitng
   // Pagination
   DEFAULT_PAGE_SIZE: getEnvNumber('DEFAULT_PAGE_SIZE', 20),
   MAX_PAGE_SIZE: getEnvNumber('MAX_PAGE_SIZE', 100),

@@ -101,6 +101,12 @@ async function createVendorHandler(req: NextRequest, _context: any, auth: JwtPay
     return createdResponse(vendor, 'Vendor created successfully');
   } catch (error: any) {
     console.error('Create vendor error:', error);
+    if (error.name === 'ValidationError') {
+      return errorResponse(error.message, 400);
+    }
+    if (error.code === 11000) {
+      return errorResponse('A vendor with this code or details already exists', 400);
+    }
     return serverErrorResponse();
   }
 }

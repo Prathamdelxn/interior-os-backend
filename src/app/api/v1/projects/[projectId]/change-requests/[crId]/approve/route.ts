@@ -93,13 +93,13 @@ async function approveCrHandler(
     // Copy drawings & renders to VO attachments
     const attachments: Array<{ name: string; url: string; type: 'photo' | 'drawing' | 'design_ref' | 'client_doc' }> = [];
     if (changeRequest.designReview) {
-      changeRequest.designReview.updatedDrawings.forEach(d => {
+      (changeRequest.designReview.updatedDrawings || []).forEach(d => {
         attachments.push({ name: d.name, url: d.url, type: 'drawing' });
       });
-      changeRequest.designReview.threeDRenders.forEach(r => {
+      (changeRequest.designReview.threeDRenders || []).forEach(r => {
         attachments.push({ name: r.name, url: r.url, type: 'design_ref' });
       });
-      changeRequest.designReview.materialSamples.forEach(m => {
+      (changeRequest.designReview.materialSamples || []).forEach(m => {
         attachments.push({ name: m.name, url: m.url, type: 'photo' });
       });
     }

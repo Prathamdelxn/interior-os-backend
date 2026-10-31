@@ -18,6 +18,7 @@ const updatePoSchema = z.object({
   deliveryDate: z.union([z.string(), z.date()]).transform((val) => new Date(val)).optional(),
   items: z.array(z.any()).optional(),
   amount: z.number().optional(),
+  isLinkActive: z.boolean().optional(),
   grns: z.array(z.any()).optional(),
   grnData: z.any().optional(),
 }).passthrough();

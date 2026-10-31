@@ -10,6 +10,7 @@ import { ProjectMember } from '@/models/project-member.model';
 import { Role } from '@/models/role.model';
 import { successResponse, errorResponse, forbiddenResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
+import { isOrgAdmin, can } from '@/lib/rbac';
 import { z } from 'zod';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
@@ -59,11 +60,12 @@ async function updateUserHandler(req: NextRequest, context: { params: Promise<Re
     await connectDB();
     const organizationId = getOrganizationId(auth);
     const { userId } = await context.params;
-    const isAdmin = auth.systemRole === 'super_admin' || auth.systemRole === 'org_admin';
+    const isAdmin = isOrgAdmin(auth);
+    const canManageAll = isAdmin || (await can(auth, 'users', 'update'));
     const isSelf = String(userId) === String(auth.userId);
-    // Admins manage everyone; anyone may edit their own profile details (Settings → Profile)
-    if (!isAdmin && !isSelf) {
-      return forbiddenResponse('Only organization admins can update users');
+    // Admins or users with users:update manage everyone; anyone may edit their own profile details (Settings → Profile)
+    if (!canManageAll && !isSelf) {
+      return forbiddenResponse('Permission denied to update user');
     }
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -84,9 +86,9 @@ async function updateUserHandler(req: NextRequest, context: { params: Promise<Re
     const { firstName, lastName, email, password, phone, avatar, designation, department, role, systemRole, status } = validation.data;
 
     // Your own profile: name, phone, designation and department only — email, password
-    // (Settings → Change password), role, system role and status stay admin-only
-    if (!isAdmin && (email !== undefined || password !== undefined || role !== undefined || systemRole !== undefined || status !== undefined)) {
-      return forbiddenResponse('Only organization admins can change email, role or status');
+    // (Settings → Change password), role, system role and status stay admin/manager with users:update only
+    if (!canManageAll && (email !== undefined || password !== undefined || role !== undefined || systemRole !== undefined || status !== undefined)) {
+      return forbiddenResponse('Only organization admins or users with user update permissions can change email, role or status');
     }
 
     // Check unique email if email is being changed
@@ -105,10 +107,23 @@ async function updateUserHandler(req: NextRequest, context: { params: Promise<Re
           roleDoc = await Role.findOne({ _id: role, organizationId });
         }
         if (!roleDoc) {
-          roleDoc = await Role.findOne({ slug: role, organizationId });
+          const normalizedSlug = role.toLowerCase().replace(/_/g, '-');
+          const altSlug = role.toLowerCase().replace(/-/g, '_');
+          roleDoc = await Role.findOne({
+            organizationId,
+            $or: [
+              { slug: role.toLowerCase() },
+              { slug: normalizedSlug },
+              { slug: altSlug },
+              { name: new RegExp('^' + role.replace(/[-_]/g, ' ') + '$', 'i') },
+            ],
+          });
         }
         if (roleDoc) {
           user.role = roleDoc._id;
+          if (roleDoc.slug === 'admin' || roleDoc.slug === 'org_admin') {
+            user.systemRole = 'org_admin';
+          }
         } else {
           user.role = undefined as any;
         }
@@ -144,8 +159,9 @@ async function updateUserHandler(req: NextRequest, context: { params: Promise<Re
 // DELETE /api/v1/users/[userId] — Delete/deactivate user
 async function deleteUserHandler(req: NextRequest, context: { params: Promise<Record<string, string>> }, auth: JwtPayload) {
   try {
-    if (auth.systemRole !== 'super_admin' && auth.systemRole !== 'org_admin') {
-      return forbiddenResponse('Only organization admins can delete users');
+    const canDelete = isOrgAdmin(auth) || (await can(auth, 'users', 'delete'));
+    if (!canDelete) {
+      return forbiddenResponse('Permission denied to delete user');
     }
 
     await connectDB();

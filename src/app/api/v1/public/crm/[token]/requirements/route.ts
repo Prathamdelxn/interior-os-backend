@@ -30,9 +30,6 @@ export async function POST(
     }
 
     if (customer.shareSettings?.isPublic === false) {
-      if (customer.clientRequirementsSubmittedAt) {
-        return errorResponse('Requirements have already been submitted for this link. The link has been closed.', 403);
-      }
       return errorResponse('This requirement share link has been disabled or stopped', 403);
     }
 
@@ -52,11 +49,6 @@ export async function POST(
       customer.budgetRange = budgetRange;
     }
 
-    // Automatically stop / disable the sharing link once requirements are submitted
-    if (customer.shareSettings) {
-      customer.shareSettings.isPublic = false;
-    }
-
     await customer.save();
 
     // Log Activity in CRM for team notification
@@ -68,7 +60,7 @@ export async function POST(
       user: customer.assignedSalesExecutive || customer.designerAssigned || customer.createdBy,
       type: 'Requirement Gathering',
       status: 'Completed',
-      remarks: `Client (${customer.name}) submitted ${requirements.length} space requirement(s) via Client Portal. Link has been automatically disabled.${notes ? ' Notes: "' + notes + '"' : ''}`,
+      remarks: `Client (${customer.name}) submitted ${requirements.length} space requirement(s) via Client Portal.${notes ? ' Notes: "' + notes + '"' : ''}`,
       completedDate: new Date(),
     }).catch(() => null);
 

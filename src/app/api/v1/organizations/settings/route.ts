@@ -3,10 +3,11 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
-import { withAuth, getOrganizationId, withOrgAdmin } from '@/middlewares/auth.middleware';
+import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
+import { can, isOrgAdmin } from '@/lib/rbac';
 import { connectDB } from '@/lib/db';
 import { Organization } from '@/models/organization.model';
-import { successResponse, errorResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
+import { successResponse, errorResponse, notFoundResponse, serverErrorResponse, forbiddenResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import { z } from 'zod';
 
@@ -111,5 +112,13 @@ async function updateSettingsHandler(req: NextRequest, _context: any, auth: JwtP
   }
 }
 
+async function updateSettingsWithPermission(req: NextRequest, context: any, auth: JwtPayload) {
+  const hasUpdatePerm = isOrgAdmin(auth) || (await can(auth, 'settings', 'update'));
+  if (!hasUpdatePerm) {
+    return forbiddenResponse('Only organization admins or users with settings update permission can do this');
+  }
+  return updateSettingsHandler(req, context, auth);
+}
+
 export const GET = withAuth(getSettingsHandler);
-export const PATCH = withOrgAdmin(updateSettingsHandler);
+export const PATCH = withAuth(updateSettingsWithPermission);

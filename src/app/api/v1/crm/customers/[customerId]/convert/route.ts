@@ -8,6 +8,9 @@ import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { CrmActivity } from '@/models/crm-activity.model';
 import { Project } from '@/models/project.model';
+import { ProjectMember } from '@/models/project-member.model';
+import { Role } from '@/models/role.model';
+import { getDefaultPermissionsForRole } from '@/lib/project-permissions';
 import { Drawing } from '@/models/drawing.model';
 import { BOQ, BOQItem } from '@/models/boq.model';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
@@ -219,6 +222,45 @@ async function convertCustomerHandler(
     });
 
     await project.save();
+
+    // Add converting user as project manager so they have access to the converted project
+    const pmRole = await Role.findOne({ organizationId, slug: { $in: ['project-manager', 'project_manager'] } });
+    const defaultPmPerms = getDefaultPermissionsForRole('project_manager');
+    const convertingMember = new ProjectMember({
+      organizationId,
+      projectId: project._id,
+      userId: auth.userId,
+      projectRole: 'project_manager',
+      permissions: (pmRole?.permissions && pmRole.permissions.length > 0) ? pmRole.permissions : defaultPmPerms,
+      ...(pmRole ? { roleId: pmRole._id } : {}),
+    });
+    await convertingMember.save();
+
+    // Add assigned sales executive if specified and different from converter
+    if (customer.assignedSalesExecutive && String(customer.assignedSalesExecutive) !== String(auth.userId)) {
+      const seRole = await Role.findOne({ organizationId, slug: { $in: ['sales-executive', 'sales_executive', 'viewer'] } });
+      await new ProjectMember({
+        organizationId,
+        projectId: project._id,
+        userId: customer.assignedSalesExecutive,
+        projectRole: 'viewer',
+        permissions: getDefaultPermissionsForRole('viewer'),
+        ...(seRole ? { roleId: seRole._id } : {}),
+      }).save().catch(() => {});
+    }
+
+    // Add assigned designer if specified and different from converter
+    if (customer.designerAssigned && String(customer.designerAssigned) !== String(auth.userId)) {
+      const desRole = await Role.findOne({ organizationId, slug: 'designer' });
+      await new ProjectMember({
+        organizationId,
+        projectId: project._id,
+        userId: customer.designerAssigned,
+        projectRole: 'designer',
+        permissions: getDefaultPermissionsForRole('designer'),
+        ...(desRole ? { roleId: desRole._id } : {}),
+      }).save().catch(() => {});
+    }
 
     // 1. Carry over Design Files / Drawings if any
     if (customer.designFiles && customer.designFiles.length > 0) {

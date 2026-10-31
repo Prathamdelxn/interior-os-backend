@@ -10,6 +10,7 @@ import { ProjectMember } from '@/models/project-member.model';
 import { Role } from '@/models/role.model';
 import { successResponse, createdResponse, errorResponse, forbiddenResponse, serverErrorResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
+import { isOrgAdmin, can } from '@/lib/rbac';
 import { z } from 'zod';
 import mongoose from 'mongoose';
 
@@ -88,11 +89,12 @@ async function getUsersHandler(req: NextRequest, _context: any, auth: JwtPayload
   }
 }
 
-// POST: Onboard a new team member (admin-only)
+// POST: Onboard a new team member
 async function createUserHandler(req: NextRequest, _context: any, auth: JwtPayload) {
   try {
-    if (auth.systemRole !== 'super_admin' && auth.systemRole !== 'org_admin') {
-      return forbiddenResponse('Only organization admins can create new users');
+    const canCreate = isOrgAdmin(auth) || (await can(auth, 'users', 'create'));
+    if (!canCreate) {
+      return forbiddenResponse('Only organization admins or users with user creation permission can create new users');
     }
 
     await connectDB();
@@ -106,7 +108,10 @@ async function createUserHandler(req: NextRequest, _context: any, auth: JwtPaylo
 
     const { firstName, lastName, email, password, phone, designation, department, role, systemRole } = validation.data;
 
-    const existing = await User.findOne({ email: email.toLowerCase() });
+    const existing = await User.findOne({
+      email: email.toLowerCase(),
+      isDeleted: { $in: [true, false] },
+    });
     // A user deleted from this organization can be created again (their record is restored below)
     const restoring = !!existing && existing.isDeleted && String(existing.organizationId) === String(organizationId);
     if (existing && !restoring) {
@@ -114,17 +119,34 @@ async function createUserHandler(req: NextRequest, _context: any, auth: JwtPaylo
     }
 
     let resolvedRoleId: mongoose.Types.ObjectId | undefined = undefined;
+    let finalSystemRole = systemRole || 'member';
     if (role) {
       if (mongoose.Types.ObjectId.isValid(role)) {
         const roleDoc = await Role.findOne({ _id: role, organizationId });
         if (roleDoc) {
           resolvedRoleId = roleDoc._id as mongoose.Types.ObjectId;
+          if (roleDoc.slug === 'admin' || roleDoc.slug === 'org_admin') {
+            finalSystemRole = 'org_admin';
+          }
         }
       }
       if (!resolvedRoleId) {
-        const roleDoc = await Role.findOne({ slug: role, organizationId });
+        const normalizedSlug = role.toLowerCase().replace(/_/g, '-');
+        const altSlug = role.toLowerCase().replace(/-/g, '_');
+        const roleDoc = await Role.findOne({
+          organizationId,
+          $or: [
+            { slug: role.toLowerCase() },
+            { slug: normalizedSlug },
+            { slug: altSlug },
+            { name: new RegExp('^' + role.replace(/[-_]/g, ' ') + '$', 'i') },
+          ],
+        });
         if (roleDoc) {
           resolvedRoleId = roleDoc._id as mongoose.Types.ObjectId;
+          if (roleDoc.slug === 'admin' || roleDoc.slug === 'org_admin') {
+            finalSystemRole = 'org_admin';
+          }
         }
       }
     }
@@ -138,7 +160,7 @@ async function createUserHandler(req: NextRequest, _context: any, auth: JwtPaylo
       designation,
       department,
       role: resolvedRoleId || undefined,
-      systemRole: systemRole || 'member',
+      systemRole: finalSystemRole,
       status: 'active',
       isDeleted: false,
       deletedAt: undefined,

@@ -62,8 +62,12 @@ async function inviteMemberHandler(
       projectRole = linkedRole.projectRole;
     }
 
-    // Check if the user email already exists in the organization
-    const existingUser = await User.findOne({ email: email.toLowerCase(), organizationId });
+    // Check if the user email already exists in the organization (including soft-deleted)
+    const existingUser = await User.findOne({
+      email: email.toLowerCase(),
+      organizationId,
+      isDeleted: { $in: [true, false] },
+    });
     if (existingUser && !existingUser.isDeleted) {
       return conflictResponse('A user with this email already exists in the organization. Please use the Add Existing Member flow.');
     }
@@ -77,12 +81,20 @@ async function inviteMemberHandler(
         systemRole: 'member',
         isEmailVerified: true,
       });
+
+    // Ensure user has a valid global role
+    let globalRole = newUser.role;
+    if (!globalRole && linkedRole?.roleId) {
+      globalRole = linkedRole.roleId;
+    }
+
     Object.assign(newUser, {
       firstName,
       lastName,
       password: password || 'welcome123',
       designation,
       department,
+      role: globalRole || undefined,
       status: 'active',
       isDeleted: false,
       deletedAt: undefined,

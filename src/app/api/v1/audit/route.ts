@@ -113,5 +113,11 @@ async function createAuditLogHandler(req: NextRequest, _context: any, auth: JwtP
   }
 }
 
-export const GET = withOrgAdmin(getAuditLogsHandler);
+export const GET = withAuth(async (req, context, auth) => {
+  const { can, isOrgAdmin } = await import('@/lib/rbac');
+  if (!isOrgAdmin(auth) && !(await can(auth, 'audit_logs', 'read'))) {
+    return forbiddenResponse("You don't have permission to view audit logs");
+  }
+  return getAuditLogsHandler(req, context, auth);
+});
 export const POST = withAuth(createAuditLogHandler);

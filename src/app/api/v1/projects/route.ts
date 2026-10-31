@@ -7,13 +7,15 @@ import { withAuth, getOrganizationId, withPermission } from '@/middlewares/auth.
 import { isOrgAdmin, projectIdsAllowing } from '@/lib/rbac';
 import { connectDB } from '@/lib/db';
 import { Project } from '@/models/project.model';
-import { CrmCustomer } from '@/models/crm-customer.model';
 import { ProjectMember } from '@/models/project-member.model';
+import { Role } from '@/models/role.model';
+import { getDefaultPermissionsForRole } from '@/lib/project-permissions';
 import { Building, Floor, Zone, Area, Package } from '@/models/wbs.model';
 import { Task } from '@/models/task.model';
 import { Milestone } from '@/models/milestone.model';
 import { PurchaseOrder } from '@/models/purchase-order.model';
 import { ProjectTemplate } from '@/models/project-template.model';
+import { CrmCustomer } from '@/models/crm-customer.model';
 import { calculateProjectMetrics } from '@/services/project-metrics.service';
 import { successResponse, createdResponse, serverErrorResponse, paginatedResponse, parsePaginationParams, buildPaginationMeta, errorResponse, forbiddenResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
@@ -221,11 +223,15 @@ async function createProjectHandler(req: NextRequest, _context: any, auth: JwtPa
 
     await project.save();
 
+    const pmRole = await Role.findOne({ organizationId, slug: { $in: ['project-manager', 'project_manager'] } });
+    const defaultPmPerms = getDefaultPermissionsForRole('project_manager');
     const member = new ProjectMember({
       organizationId,
       projectId: project._id,
       userId: auth.userId,
       projectRole: 'project_manager',
+      permissions: (pmRole?.permissions && pmRole.permissions.length > 0) ? pmRole.permissions : defaultPmPerms,
+      ...(pmRole ? { roleId: pmRole._id } : {}),
     });
     await member.save();
 

@@ -37,7 +37,13 @@ const VendorSchema = new Schema<IVendor>(
       type: String,
       trim: true,
       lowercase: true,
-      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
+      validate: {
+        validator: function (v: string) {
+          if (!v || v.trim() === '') return true;
+          return /^\S+@\S+\.\S+$/.test(v);
+        },
+        message: 'Please provide a valid email',
+      },
     },
     phoneNumber: { type: String, trim: true },
     gstNumber: { type: String, trim: true },

@@ -29,7 +29,8 @@ async function handler(_req: NextRequest, _context: { params: Promise<Record<str
       crm: await canAny(auth, CRM_MODULES, 'read'),
       projects: await canOnAnyRole(auth, 'projects', 'read'),
       vendors: await canAny(auth, ['vendors'], 'read'),
-      usersRoles: await canAny(auth, ['roles'], 'read'), // admins always pass canAny
+      usersRoles: (await canAny(auth, ['roles'], 'read')) || (await canAny(auth, ['users'], 'read')),
+      audit: (await canAny(auth, ['audit_logs'], 'read')),
     };
 
     return successResponse({

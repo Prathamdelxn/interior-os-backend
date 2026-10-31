@@ -30,9 +30,6 @@ export async function GET(
     }
 
     if (customer.shareSettings?.isPublic === false) {
-      if (customer.clientRequirementsSubmittedAt) {
-        return errorResponse('Requirements have already been submitted for this link. The link has been closed.', 403);
-      }
       return errorResponse('This share link has been stopped or disabled by the studio.', 403);
     }
 

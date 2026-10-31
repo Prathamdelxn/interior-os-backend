@@ -36,6 +36,7 @@ export interface IPurchaseOrder extends Document {
     }>;
   }>;
 
+  isLinkActive?: boolean;
   isDeleted: boolean;
   deletedAt?: Date;
   createdAt: Date;
@@ -58,6 +59,7 @@ const PurchaseOrderSchema = new Schema<IPurchaseOrder>(
       index: true,
     },
     deliveryDate: Date,
+    isLinkActive: { type: Boolean, default: true },
     items: [
       {
         name: { type: String, required: true },

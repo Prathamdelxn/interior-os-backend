@@ -135,7 +135,11 @@ async function updateRoleHandler(
     }
 
     if (description !== undefined) role.description = description;
-    if (permissions !== undefined) role.permissions = permissions as any;
+    if (permissions !== undefined) {
+      const submittedModules = new Set(permissions.map((p) => p.module));
+      const preserved = (role.permissions || []).filter((p: any) => !submittedModules.has(p.module));
+      role.permissions = [...permissions, ...preserved] as any;
+    }
     if (isActive !== undefined) role.isActive = isActive;
 
     await role.save();

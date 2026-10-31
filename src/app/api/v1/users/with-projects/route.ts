@@ -24,9 +24,10 @@ async function getUsersWithProjectsHandler(req: NextRequest, _context: any, auth
       .select('firstName lastName email phone designation department systemRole avatar status role createdAt')
       .sort({ createdAt: -1 });
 
-    // 2. Fetch all project memberships for this org (with project ref)
+    // 2. Fetch all project memberships for this org (with project ref and linked role)
     const memberships = await ProjectMember.find({ organizationId, isDeleted: false })
-      .select('userId projectId projectRole permissions');
+      .select('userId projectId projectRole roleId permissions')
+      .populate('roleId', 'name slug permissions');
 
     // 3. Fetch all projects (minimal fields)
     const projects = await Project.find({ organizationId, isDeleted: false })
@@ -42,13 +43,19 @@ async function getUsersWithProjectsHandler(req: NextRequest, _context: any, auth
       if (!membershipByUser.has(userId)) membershipByUser.set(userId, []);
       const project = projectMap.get(m.projectId.toString());
       if (project) {
+        const linkedRole = (m as any).roleId;
+        const effectivePerms =
+          linkedRole && typeof linkedRole === 'object' && Array.isArray(linkedRole.permissions) && linkedRole.permissions.length > 0
+            ? linkedRole.permissions
+            : m.permissions;
+
         membershipByUser.get(userId)!.push({
           projectId: m.projectId,
           projectName: (project as any).name,
           projectStatus: (project as any).status,
           projectType: (project as any).type,
           projectRole: m.projectRole,
-          permissions: m.permissions,
+          permissions: effectivePerms,
         });
       }
     }
@@ -66,4 +73,11 @@ async function getUsersWithProjectsHandler(req: NextRequest, _context: any, auth
   }
 }
 
-export const GET = withOrgAdmin(getUsersWithProjectsHandler); // the Users tab is admin-only
+export const GET = withAuth(async (req, context, auth) => {
+  const { can, isOrgAdmin } = await import('@/lib/rbac');
+  if (!isOrgAdmin(auth) && !(await can(auth, 'users', 'read'))) {
+    const { forbiddenResponse } = await import('@/lib/api-response');
+    return forbiddenResponse("You don't have permission to view team members");
+  }
+  return getUsersWithProjectsHandler(req, context, auth);
+});

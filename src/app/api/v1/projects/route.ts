@@ -235,6 +235,51 @@ async function createProjectHandler(req: NextRequest, _context: any, auth: JwtPa
     });
     await member.save();
 
+    // ── Auto-initialize Site Profile (CrmCustomer) for direct project ──
+    try {
+      const clientName = (project.client || project.name || 'Project Client').trim();
+      const customersWithLeadNum = await CrmCustomer.find({
+        organizationId,
+        leadNumber: { $regex: /^LD-\d+$/ },
+      }).select('leadNumber').lean();
+
+      let maxNum = 1000;
+      for (const cust of customersWithLeadNum) {
+        if (cust.leadNumber) {
+          const match = cust.leadNumber.match(/^LD-(\d+)$/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxNum) maxNum = num;
+          }
+        }
+      }
+
+      let propType: 'Flat' | 'Villa' | 'Office' | 'Shop' | 'Other' = 'Other';
+      if (project.type === 'Commercial Office' || project.type === 'Tech Office' || project.type === 'Co-working Space') {
+        propType = 'Office';
+      } else if (project.type === 'Residential') {
+        propType = 'Flat';
+      }
+
+      const directLead = new CrmCustomer({
+        organizationId,
+        leadNumber: `LD-${maxNum + 1}`,
+        name: clientName,
+        mobileNumber: '9876543210',
+        leadSource: 'Existing Customer',
+        status: 'Won',
+        propertyType: propType,
+        projectLocation: project.location?.city || project.location?.address || '',
+        budgetRange: project.budget?.amount ? String(project.budget.amount) : '',
+        linkedProject: project._id,
+        createdBy: auth.userId,
+      });
+
+      await directLead.save();
+    } catch (crmErr) {
+      console.warn('Failed to auto-create linked CRM profile for direct project:', crmErr);
+    }
+
     // ── Generate WBS, Tasks, Milestones, and POs from template ──────────────
     if (templateId) {
       const template = await ProjectTemplate.findOne({ _id: templateId, isDeleted: false });

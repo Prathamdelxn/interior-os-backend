@@ -18,10 +18,8 @@ const updateCustomerSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(2, 'Name must be at least 2 characters long')
-    .max(50, 'Name cannot exceed 50 characters')
-    .refine((val) => !/\d/.test(val), 'Full name cannot contain numbers')
-    .refine((val) => /^[a-zA-Z\s'.-]+$/.test(val), 'Full name can only contain letters, spaces, hyphens, and dots')
+    .min(1, 'Name must be at least 1 character long')
+    .max(100, 'Name cannot exceed 100 characters')
     .optional(),
   mobileNumber: z
     .string()

@@ -36,10 +36,8 @@ const createCustomerSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(2, 'Full name must be at least 2 characters long')
-    .max(50, 'Full name cannot exceed 50 characters')
-    .refine((val) => !/\d/.test(val), 'Full name cannot contain numbers')
-    .refine((val) => /^[a-zA-Z\s'.-]+$/.test(val), 'Full name can only contain letters, spaces, hyphens, and dots'),
+    .min(1, 'Full name must be at least 1 character long')
+    .max(100, 'Full name cannot exceed 100 characters'),
   mobileNumber: z
     .string()
     .trim()
@@ -85,6 +83,11 @@ const createCustomerSchema = z.object({
   siteVisitScheduledDate: z.coerce.date().optional(),
   futureFollowUpDate: z.coerce.date().optional(),
   remarks: z.string().trim().max(1000, 'Remarks cannot exceed 1000 characters').optional(),
+  status: z.string().optional(),
+  linkedProject: z.string().optional(),
+  requirements: z.any().optional(),
+  siteMeasurements: z.any().optional(),
+  sitePhotos: z.array(z.string()).optional(),
 });
 
 // GET: List all customers/leads with server-side pagination & filtering
@@ -287,7 +290,8 @@ async function createCustomerHandler(req: NextRequest, _context: any, auth: JwtP
           leadNumber,
           organizationId,
           createdBy: auth.userId,
-          status: 'New Lead',
+          status: dataToSave.status || 'New Lead',
+          ...(dataToSave.linkedProject ? { linkedProject: dataToSave.linkedProject } : {}),
         });
 
         await customer.save();

@@ -90,8 +90,12 @@ async function approveDrawingHandler(
       drawing.status = 'internally_approved';
       drawing.rejectionReason = undefined;
       drawing.url = targetVersion.url;
-      drawing.name = targetVersion.name;
-      drawing.fileType = targetVersion.fileType;
+      if (targetVersion.name && (targetVersion.name.includes('.') || !drawing.name)) {
+        drawing.name = targetVersion.name;
+      }
+      if (targetVersion.fileType) {
+        drawing.fileType = targetVersion.fileType;
+      }
     } else {
       targetVersion.approvalStatus = 'internally_rejected';
       targetVersion.approvedBy = reviewerId;

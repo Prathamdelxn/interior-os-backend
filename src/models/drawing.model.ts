@@ -50,6 +50,19 @@ export interface IDrawing extends Document {
   status: 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected';
   revisions: IDrawingRevision[];
   annotations?: IDrawingAnnotation[];
+
+  // Approval workflow
+  assignedReviewer?: mongoose.Types.ObjectId;
+  assignedReviewerName?: string;
+  submissionNotes?: string;
+  submittedBy?: mongoose.Types.ObjectId;
+  submittedAt?: Date;
+  approvedBy?: mongoose.Types.ObjectId;
+  approvedAt?: Date;
+  rejectedBy?: mongoose.Types.ObjectId;
+  rejectedAt?: Date;
+  rejectionReason?: string;
+
   isDeleted: boolean;
   deletedAt?: Date;
   createdAt: Date;
@@ -117,6 +130,19 @@ const DrawingSchema = new Schema<IDrawing>(
       },
       { _id: false }
     ],
+
+    // Approval workflow
+    assignedReviewer: { type: Schema.Types.ObjectId, ref: 'User' },
+    assignedReviewerName: { type: String, trim: true },
+    submissionNotes: { type: String, trim: true },
+    submittedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    submittedAt: { type: Date },
+    approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    approvedAt: { type: Date },
+    rejectedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    rejectedAt: { type: Date },
+    rejectionReason: { type: String, trim: true },
+
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: Date,
   },

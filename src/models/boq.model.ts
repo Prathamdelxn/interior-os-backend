@@ -19,6 +19,9 @@ export interface IBOQ extends Document {
   sections?: any[];
 
   // Approval workflow
+  assignedReviewer?: mongoose.Types.ObjectId;
+  assignedReviewerName?: string;
+  submissionNotes?: string;
   submittedBy?: mongoose.Types.ObjectId;
   submittedAt?: Date;
   approvedBy?: mongoose.Types.ObjectId;
@@ -59,6 +62,9 @@ const BOQSchema = new Schema<IBOQ>(
     sections: { type: [Schema.Types.Mixed], default: [] },
 
     // Approval workflow
+    assignedReviewer: { type: Schema.Types.ObjectId, ref: 'User' },
+    assignedReviewerName: { type: String, trim: true },
+    submissionNotes: { type: String, trim: true },
     submittedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     submittedAt: { type: Date },
     approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },

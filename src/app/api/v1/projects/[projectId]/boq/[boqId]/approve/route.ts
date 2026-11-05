@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { NextRequest } from 'next/server';
+import mongoose from 'mongoose';
 import { withAuth, getOrganizationId } from '@/middlewares/auth.middleware';
 import { can } from '@/lib/rbac';
 import { connectDB } from '@/lib/db';
@@ -15,6 +16,13 @@ import { z } from 'zod';
 const approvalActionSchema = z.object({
   action: z.enum(['submit', 'approve', 'reject']),
   reason: z.string().optional(),
+  // submit only: who should review it, and a note for them
+  assignedReviewer: z
+    .string()
+    .refine((v) => mongoose.Types.ObjectId.isValid(v), 'assignedReviewer must be a valid user id')
+    .optional(),
+  assignedReviewerName: z.string().optional(),
+  submissionNotes: z.string().optional(),
 });
 
 // POST: Submit for approval / Approve / Reject a BOQ
@@ -30,7 +38,7 @@ async function approvalHandler(req: NextRequest, context: { params: Promise<Reco
       return errorResponse(validation.error.issues[0].message, 400);
     }
 
-    const { action, reason } = validation.data;
+    const { action, reason, assignedReviewer, assignedReviewerName, submissionNotes } = validation.data;
 
     // Sending for approval is editing the BOQ (Update); approving / rejecting is the decision (Approve)
     const { projectId: permProjectId } = await context.params;
@@ -62,6 +70,11 @@ async function approvalHandler(req: NextRequest, context: { params: Promise<Reco
         boq.status = 'pending_approval';
         boq.submittedBy = auth.userId as any;
         boq.submittedAt = new Date();
+        if (assignedReviewer) {
+          boq.assignedReviewer = new mongoose.Types.ObjectId(assignedReviewer);
+          boq.assignedReviewerName = assignedReviewerName?.trim() || undefined;
+        }
+        boq.submissionNotes = submissionNotes?.trim() || undefined;
         // Clear previous rejection if resubmitting
         boq.rejectedBy = undefined;
         boq.rejectedAt = undefined;

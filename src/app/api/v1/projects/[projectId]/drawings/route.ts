@@ -35,7 +35,7 @@ async function createDrawingHandler(req: NextRequest, context: { params: Promise
     const { projectId } = await context.params;
     const body = await req.json();
 
-    const { title, discipline, fileUrl, url, drawingType, fileType } = body;
+    const { title, discipline, fileUrl, url, drawingType, fileType, status } = body;
     const effectiveFileUrl = fileUrl || url;
     if (!title || !effectiveFileUrl) {
       return errorResponse('title and fileUrl are required', 400);
@@ -55,7 +55,8 @@ async function createDrawingHandler(req: NextRequest, context: { params: Promise
       drawingType: type,
       discipline: disc,
       fileType: fileType || '',
-      status: 'submitted',
+      // New uploads start as a draft until they are sent to a reviewer (older clients omit status)
+      status: status === 'draft' ? 'draft' : 'submitted',
       revisions: [
         {
           revision: 'Rev 0',
@@ -83,14 +84,18 @@ async function updateDrawingHandler(req: NextRequest, context: { params: Promise
     const { projectId } = await context.params;
     const body = await req.json();
 
-    const { drawingId, status, fileUrl, url, changes, revisionName, revision, title, discipline, drawingType, fileType, annotations } = body;
+    const {
+      drawingId, status, fileUrl, url, changes, revisionName, revision, title, discipline, drawingType, fileType, annotations,
+      assignedReviewer, assignedReviewerName, submissionNotes, rejectionReason,
+    } = body;
     if (!drawingId) {
       return errorResponse('drawingId is required', 400);
     }
 
     // Approving / rejecting (a status-only change to approved or rejected) is an Approve decision;
-    // every other change is an edit (Update)
-    const otherFields = Object.keys(body).filter((k) => k !== 'drawingId' && k !== 'status' && body[k] !== undefined);
+    // every other change is an edit (Update). Decision metadata (reason / timestamps) doesn't count as an edit.
+    const DECISION_FIELDS = ['drawingId', 'status', 'rejectionReason', 'approvedAt', 'rejectedAt'];
+    const otherFields = Object.keys(body).filter((k) => !DECISION_FIELDS.includes(k) && body[k] !== undefined);
     const isDecision = (status === 'approved' || status === 'rejected') && otherFields.length === 0;
     const needed = isDecision ? 'approve' : 'update';
     if (!(await can(auth, 'drawings', needed, projectId))) {
@@ -129,6 +134,44 @@ async function updateDrawingHandler(req: NextRequest, context: { params: Promise
     if (status) updatePayload.status = status;
     if (annotations !== undefined) updatePayload.annotations = annotations;
 
+    const userId = new mongoose.Types.ObjectId(auth.userId);
+    const unsetPayload: Record<string, ''> = {};
+
+    // Send for approval: record the reviewer and who sent it
+    if (assignedReviewer !== undefined) {
+      if (assignedReviewer && !mongoose.Types.ObjectId.isValid(String(assignedReviewer))) {
+        return errorResponse('assignedReviewer must be a valid user id', 400);
+      }
+      if (assignedReviewer) {
+        updatePayload.assignedReviewer = new mongoose.Types.ObjectId(String(assignedReviewer));
+        updatePayload.assignedReviewerName = assignedReviewerName ? String(assignedReviewerName).trim() : undefined;
+      } else {
+        unsetPayload.assignedReviewer = '';
+        unsetPayload.assignedReviewerName = '';
+      }
+    }
+    if (submissionNotes !== undefined) updatePayload.submissionNotes = String(submissionNotes).trim();
+    if (status === 'under_review') {
+      if (!updatePayload.assignedReviewer && !drawing.assignedReviewer) {
+        return errorResponse('Select a reviewer before sending the drawing for approval', 400);
+      }
+      updatePayload.submittedBy = userId;
+      updatePayload.submittedAt = new Date();
+    }
+
+    // Decision: stamp approver / rejecter server-side
+    if (status === 'approved') {
+      updatePayload.approvedBy = userId;
+      updatePayload.approvedAt = new Date();
+      unsetPayload.rejectionReason = '';
+      unsetPayload.rejectedBy = '';
+      unsetPayload.rejectedAt = '';
+    } else if (status === 'rejected') {
+      updatePayload.rejectedBy = userId;
+      updatePayload.rejectedAt = new Date();
+      if (rejectionReason) updatePayload.rejectionReason = String(rejectionReason).trim();
+    }
+
     // If uploading a new revision
     if (effectiveFileUrl && effectiveRevName) {
       const newRev = {
@@ -140,13 +183,20 @@ async function updateDrawingHandler(req: NextRequest, context: { params: Promise
       };
       updatePayload.$push = { revisions: newRev };
       updatePayload.status = 'submitted';
+      // A new revision answers the change request; it goes back to the same reviewer
+      delete updatePayload.rejectionReason;
+      unsetPayload.rejectionReason = '';
+      unsetPayload.rejectedBy = '';
+      unsetPayload.rejectedAt = '';
     }
 
-    const updatedDrawing = await Drawing.findByIdAndUpdate(
-      drawing._id,
-      updatePayload.$push ? { $set: updatePayload, $push: updatePayload.$push } : { $set: updatePayload },
-      { new: true, runValidators: false }
-    );
+    const { $push, ...setPayload } = updatePayload;
+    Object.keys(setPayload).forEach((k) => setPayload[k] === undefined && delete setPayload[k]);
+    const updateOps: any = { $set: setPayload };
+    if ($push) updateOps.$push = $push;
+    if (Object.keys(unsetPayload).length > 0) updateOps.$unset = unsetPayload;
+
+    const updatedDrawing = await Drawing.findByIdAndUpdate(drawing._id, updateOps, { new: true, runValidators: false });
 
     return successResponse(updatedDrawing || drawing, 'Drawing updated successfully');
   } catch (error) {

@@ -87,6 +87,10 @@ export { VariationOrder } from './variation-order.model';
 export type { IVariationOrder } from './variation-order.model';
 
 export { CRMLead } from './crm-lead.model';
+export { CrmCustomer } from './crm-customer.model';
+export type { ICrmCustomer } from './crm-customer.model';
+export { CrmActivity } from './crm-activity.model';
+export type { ICrmActivity } from './crm-activity.model';
 export type { ICRMLead, ISiteVisit, IMeasurement, IRequirements, IQuotationVersion, IBOQQuoteItem } from './crm-lead.model';
 
 export { ProjectFile } from './project-file.model';

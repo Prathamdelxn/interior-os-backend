@@ -9,6 +9,7 @@ import { connectDB } from '@/lib/db';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { CrmActivity } from '@/models/crm-activity.model';
 import { User } from '@/models/user.model';
+import { Project } from '@/models/project.model';
 import { successResponse, errorResponse, serverErrorResponse, forbiddenResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 import mongoose from 'mongoose';
@@ -96,7 +97,7 @@ async function getSingleCustomerHandler(
       .populate('assignedSalesExecutive', 'firstName lastName email fullName avatar')
       .populate('designerAssigned', 'firstName lastName email fullName avatar')
       .populate('createdBy', 'firstName lastName email fullName')
-      .populate('linkedProject', 'name projectNumber status')
+      .populate('linkedProject', 'name code projectNumber status')
       .lean();
 
     if (!customer) {

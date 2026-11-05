@@ -98,6 +98,11 @@ const ProjectSchema = new Schema<IProject>(
   }
 );
 
+// Virtuals
+ProjectSchema.virtual('projectNumber').get(function () {
+  return this.code;
+});
+
 // Indexes
 ProjectSchema.index({ organizationId: 1, code: 1 }, { unique: true });
 ProjectSchema.index({ name: 'text', client: 'text', code: 'text' });

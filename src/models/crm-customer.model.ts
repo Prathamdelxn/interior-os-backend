@@ -3,6 +3,8 @@
 // =============================================================================
 
 import mongoose, { Schema, Document, Model } from 'mongoose';
+import './user.model';
+import './project.model';
 
 export interface ISiteMeasurements {
   carpetArea?: string;

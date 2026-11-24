@@ -41,13 +41,14 @@ async function getWbsHandler(req: NextRequest, context: { params: Promise<Record
     const organizationId = getOrganizationId(auth);
     const { projectId } = await context.params;
 
-    // Fetch all nodes and tasks in parallel
+    // Fetch all nodes and tasks in parallel — only the fields the tree uses (smaller, faster payloads).
+    const NODE_FIELDS = 'name description startDate endDate status';
     const [buildings, floors, zones, areas, packages, tasks] = await Promise.all([
-      Building.find({ projectId, organizationId }).lean(),
-      Floor.find({ projectId, organizationId }).lean(),
-      Zone.find({ projectId, organizationId }).lean(),
-      Area.find({ projectId, organizationId }).lean(),
-      Package.find({ projectId, organizationId }).lean(),
+      Building.find({ projectId, organizationId }).select(NODE_FIELDS).lean(),
+      Floor.find({ projectId, organizationId }).select(`${NODE_FIELDS} buildingId`).lean(),
+      Zone.find({ projectId, organizationId }).select(`${NODE_FIELDS} floorId`).lean(),
+      Area.find({ projectId, organizationId }).select(`${NODE_FIELDS} zoneId`).lean(),
+      Package.find({ projectId, organizationId }).select(`${NODE_FIELDS} areaId trade`).lean(),
       Task.find({ projectId, organizationId, isDeleted: false }).select('packageId status progress').lean(),
     ]);
 
@@ -76,38 +77,48 @@ async function getWbsHandler(req: NextRequest, context: { params: Promise<Record
       ...extra,
     });
 
+    // Group children by parent once (O(n)) instead of re-filtering every list at every level (O(n²)).
+    const groupBy = (list: any[], key: string) => {
+      const m = new Map<string, any[]>();
+      for (const item of list) {
+        const k = String(item[key]);
+        const arr = m.get(k);
+        if (arr) arr.push(item);
+        else m.set(k, [item]);
+      }
+      return m;
+    };
+    const floorsByBuilding = groupBy(floors, 'buildingId');
+    const zonesByFloor = groupBy(zones, 'floorId');
+    const areasByZone = groupBy(areas, 'zoneId');
+    const packagesByArea = groupBy(packages, 'areaId');
+    const mappedPkgIds = new Set<string>();
+
+    const formatPackage = (p: any) => {
+      const stats = taskStatsByPackage.get(String(p._id)) || { total: 0, completed: 0, progressSum: 0 };
+      return formatNode(p, 'package', {
+        trade: p.trade,
+        taskCount: stats.total,
+        completedTaskCount: stats.completed,
+        progress: stats.total > 0 ? Math.round(stats.progressSum / stats.total) : 0,
+      });
+    };
+
     // Build hierarchical tree in-memory
-    const tree = buildings.map((b: any) => {
-      const bFloors = floors
-        .filter((f: any) => String(f.buildingId) === String(b._id))
-        .map((f: any) => {
-          const fZones = zones
-            .filter((z: any) => String(z.floorId) === String(f._id))
-            .map((z: any) => {
-              const zAreas = areas
-                .filter((a: any) => String(a.zoneId) === String(z._id))
-                .map((a: any) => {
-                  const aPackages = packages
-                    .filter((p: any) => String(p.areaId) === String(a._id))
-                    .map((p: any) => {
-                      const stats = taskStatsByPackage.get(String(p._id)) || { total: 0, completed: 0, progressSum: 0 };
-                      const pkgProgress = stats.total > 0 ? Math.round(stats.progressSum / stats.total) : 0;
-                      return formatNode(p, 'package', {
-                        trade: p.trade,
-                        taskCount: stats.total,
-                        completedTaskCount: stats.completed,
-                        progress: pkgProgress,
-                      });
-                    });
-
-                  return formatNode(a, 'area', { packages: aPackages });
-                });
-
-              return formatNode(z, 'zone', { areas: zAreas });
+    const tree: any[] = buildings.map((b: any) => {
+      const bFloors = (floorsByBuilding.get(String(b._id)) || []).map((f: any) => {
+        const fZones = (zonesByFloor.get(String(f._id)) || []).map((z: any) => {
+          const zAreas = (areasByZone.get(String(z._id)) || []).map((a: any) => {
+            const aPackages = (packagesByArea.get(String(a._id)) || []).map((p: any) => {
+              mappedPkgIds.add(String(p._id));
+              return formatPackage(p);
             });
-
-          return formatNode(f, 'floor', { zones: fZones });
+            return formatNode(a, 'area', { packages: aPackages });
+          });
+          return formatNode(z, 'zone', { areas: zAreas });
         });
+        return formatNode(f, 'floor', { zones: fZones });
+      });
 
       const bStats = taskStatsByPackage.get(String(b._id)) || { total: 0, completed: 0, progressSum: 0 };
       const bProgress = bStats.total > 0 ? Math.round(bStats.progressSum / bStats.total) : 0;
@@ -119,32 +130,10 @@ async function getWbsHandler(req: NextRequest, context: { params: Promise<Record
       });
     });
 
-    // Check for packages that might not be under existing buildings/areas
-    const mappedPkgIds = new Set<string>();
-    for (const b of tree) {
-      for (const f of (b as any).floors || []) {
-        for (const z of (f as any).zones || []) {
-          for (const a of (z as any).areas || []) {
-            for (const p of (a as any).packages || []) {
-              mappedPkgIds.add(String(p.id));
-            }
-          }
-        }
-      }
-    }
-
+    // Packages whose parent chain is missing go into a "General" container
     const unmappedPkgs = packages
       .filter((p: any) => !mappedPkgIds.has(String(p._id)))
-      .map((p: any) => {
-        const stats = taskStatsByPackage.get(String(p._id)) || { total: 0, completed: 0, progressSum: 0 };
-        const pkgProgress = stats.total > 0 ? Math.round(stats.progressSum / stats.total) : 0;
-        return formatNode(p, 'package', {
-          trade: p.trade,
-          taskCount: stats.total,
-          completedTaskCount: stats.completed,
-          progress: pkgProgress,
-        });
-      });
+      .map(formatPackage);
 
     if (unmappedPkgs.length > 0) {
       tree.push({

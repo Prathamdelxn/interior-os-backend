@@ -16,6 +16,10 @@ import { User } from '@/models/user.model';
 import { ProjectMember } from '@/models/project-member.model';
 import type { JwtPayload } from '@/lib/jwt';
 import { ensureOrgPermissionDefaults } from '@/lib/role-defaults';
+import { cached } from '@/lib/ttl-cache';
+
+/** Permissions change rarely; a page fires many calls at once — reuse answers for 30 s per instance. */
+const PERM_TTL_MS = 30_000;
 import type { IPermission, ModuleName, PermissionAction } from '@/models/role.model';
 
 type PermissionList = Pick<IPermission, 'module' | 'actions'>[] | undefined | null;
@@ -34,11 +38,13 @@ export function permissionListAllows(perms: PermissionList, module: ModuleName, 
 
 /** Permissions from the user's global (org-level) role. */
 export async function getGlobalPermissions(userId: string): Promise<PermissionList> {
-  await connectDB();
-  const user = await User.findById(userId).populate('role').select('role');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const role = user?.role as any;
-  return role && typeof role === 'object' ? role.permissions : [];
+  return cached(`perm:g:${userId}`, PERM_TTL_MS, async () => {
+    await connectDB();
+    const user = await User.findById(userId).select('role').populate({ path: 'role', select: 'permissions' }).lean();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const role = (user as any)?.role;
+    return role && typeof role === 'object' ? role.permissions || [] : [];
+  });
 }
 
 /** Permissions the user has on one project (linked role, else copied preset). Null if not a member. */
@@ -48,20 +54,25 @@ export async function getProjectPermissions(
   organizationId: string
 ): Promise<PermissionList> {
   if (!mongoose.isValidObjectId(projectId)) return null;
-  await connectDB();
-  const member = await ProjectMember.findOne({
-    projectId,
-    userId,
-    organizationId,
-    isDeleted: false,
-  }).populate('roleId');
-  if (!member) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const linkedRole = member.roleId as any;
-  if (linkedRole && typeof linkedRole === 'object' && Array.isArray(linkedRole.permissions)) {
-    return linkedRole.permissions;
-  }
-  return member.permissions;
+  return cached(`perm:p:${userId}:${projectId}`, PERM_TTL_MS, async () => {
+    await connectDB();
+    const member = await ProjectMember.findOne({
+      projectId,
+      userId,
+      organizationId,
+      isDeleted: false,
+    })
+      .select('roleId permissions')
+      .populate({ path: 'roleId', select: 'permissions' })
+      .lean();
+    if (!member) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const linkedRole = (member as any).roleId;
+    if (linkedRole && typeof linkedRole === 'object' && Array.isArray(linkedRole.permissions)) {
+      return linkedRole.permissions;
+    }
+    return (member as any).permissions;
+  });
 }
 
 /**
@@ -85,10 +96,13 @@ export async function can(
   if (!projectId) {
     return permissionListAllows(await getGlobalPermissions(auth.userId), module, action);
   }
-  const projectPerms = await getProjectPermissions(auth.userId, projectId, String(auth.organizationId));
+  // Both lookups are independent (and cached): fetch together instead of one after the other
+  const [projectPerms, globalPerms] = await Promise.all([
+    getProjectPermissions(auth.userId, projectId, String(auth.organizationId)),
+    getGlobalPermissions(auth.userId),
+  ]);
   if (projectPerms === null) return false; // not a member of this project
-  if (permissionListAllows(projectPerms, module, action)) return true;
-  return permissionListAllows(await getGlobalPermissions(auth.userId), module, action);
+  return permissionListAllows(projectPerms, module, action) || permissionListAllows(globalPerms, module, action);
 }
 
 /**

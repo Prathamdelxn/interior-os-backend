@@ -12,7 +12,20 @@ export interface IRFI extends Document {
   subject: string;
   question: string;
   raisedBy: mongoose.Types.ObjectId;
-  assignedTo: mongoose.Types.ObjectId;
+  /** Who must answer. Empty while the RFI is waiting for a project manager to route it. */
+  assignedTo?: mongoose.Types.ObjectId | null;
+  /** 'direct' = the raiser picked who to ask; 'triage' = raiser wasn't sure, PM routes it. */
+  routing: 'direct' | 'triage';
+  /** What the question is about — used to suggest who should answer. */
+  topic?: string;
+  /** Every hand-off: raised to X, reassigned from X to Y by Z, etc. */
+  assignmentHistory: Array<{
+    from?: mongoose.Types.ObjectId | null;
+    to?: mongoose.Types.ObjectId | null;
+    by: mongoose.Types.ObjectId;
+    note?: string;
+    at: Date;
+  }>;
   dueDate: Date;
   status: 'open' | 'responded' | 'closed';
   priority: 'low' | 'medium' | 'high' | 'critical';
@@ -34,7 +47,18 @@ const RFISchema = new Schema<IRFI>(
     subject: { type: String, required: true, trim: true },
     question: { type: String, required: true, trim: true },
     raisedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    assignedTo: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    assignedTo: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    routing: { type: String, enum: ['direct', 'triage'], default: 'direct', index: true },
+    topic: { type: String, trim: true },
+    assignmentHistory: [
+      {
+        from: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+        to: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+        by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        note: { type: String, trim: true },
+        at: { type: Date, default: Date.now },
+      },
+    ],
     dueDate: { type: Date, required: true },
     status: {
       type: String,

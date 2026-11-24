@@ -208,6 +208,8 @@ const TaskSchema = new Schema<ITask>(
 
 // Indexes
 TaskSchema.index({ name: 'text', description: 'text' });
+// Project task lists / WBS roll-ups: filter by project + org + isDeleted.
+TaskSchema.index({ projectId: 1, organizationId: 1, isDeleted: 1 });
 
 // Pre-query soft delete filters
 TaskSchema.pre('find', function () {

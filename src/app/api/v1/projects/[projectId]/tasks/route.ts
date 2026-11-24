@@ -62,14 +62,14 @@ async function getTasksHandler(req: NextRequest, context: { params: Promise<Reco
       ];
     }
 
-    const tasks = await Task.find(query)
-      .populate('assignees', 'firstName lastName email avatar designation')
-      .populate('dependencies', 'name status progress')
-      .sort({ createdAt: 1 })
-      .lean();
-
-    const { Area, Zone, Floor, Building, Package } = await import('@/models/wbs.model');
-    const [bldgs, pkgs, areas] = await Promise.all([
+    // Tasks and the WBS names they reference are independent: load them in parallel.
+    const { Area, Building, Package } = await import('@/models/wbs.model');
+    const [tasks, bldgs, pkgs, areas] = await Promise.all([
+      Task.find(query)
+        .populate('assignees', 'firstName lastName email avatar designation')
+        .populate('dependencies', 'name status progress')
+        .sort({ createdAt: 1 })
+        .lean(),
       Building.find({ projectId, organizationId }).select('name').lean(),
       Package.find({ projectId, organizationId }).select('name trade').lean(),
       Area.find({ projectId, organizationId }).select('name').lean(),

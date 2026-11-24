@@ -196,18 +196,23 @@ export async function login(input: LoginInput, deviceInfo?: { userAgent?: string
   // Generate tokens
   const tokens = generateTokenPair(user);
 
-  // Store refresh token
-  await RefreshToken.create({
-    userId: user._id,
-    token: tokens.refreshToken,
-    expiresAt: getRefreshTokenExpiry(),
-    deviceInfo,
-  });
-
-  // Update last login
-  user.lastLoginAt = new Date();
-  user.status = user.status === 'pending' ? 'active' : user.status;
-  await user.save();
+  // Store refresh token, stamp last login and load the organisation in parallel
+  // (they're independent — doing them one after another cost 3 database round trips).
+  const lastLoginAt = new Date();
+  const nextStatus = user.status === 'pending' ? 'active' : user.status;
+  const [, , organization] = await Promise.all([
+    RefreshToken.create({
+      userId: user._id,
+      token: tokens.refreshToken,
+      expiresAt: getRefreshTokenExpiry(),
+      deviceInfo,
+    }),
+    // updateOne instead of user.save(): no full-document validation / save hooks needed for two fields
+    User.updateOne({ _id: user._id }, { $set: { lastLoginAt, status: nextStatus } }),
+    Organization.findById(user.organizationId).select('name slug logo address settings').lean(),
+  ]);
+  user.lastLoginAt = lastLoginAt;
+  user.status = nextStatus;
 
   // Audit log login event
   try {
@@ -223,9 +228,6 @@ export async function login(input: LoginInput, deviceInfo?: { userAgent?: string
       metadata: deviceInfo,
     }).catch(() => {});
   } catch {}
-
-  // Get organization
-  const organization = await Organization.findById(user.organizationId);
 
   return {
     user: {

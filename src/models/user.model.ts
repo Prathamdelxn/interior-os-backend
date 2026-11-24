@@ -3,6 +3,7 @@
 // =============================================================================
 
 import mongoose, { Schema, Document, Model } from 'mongoose';
+import { invalidateAll } from '@/lib/ttl-cache';
 import bcrypt from 'bcryptjs';
 
 export interface IUser extends Document {
@@ -176,6 +177,12 @@ UserSchema.pre('findOne', function () {
 UserSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+// Any change to users clears the cached auth/permission answers (lib/ttl-cache).
+for (const op of ['save', 'updateOne', 'updateMany', 'findOneAndUpdate', 'deleteOne', 'deleteMany', 'findOneAndDelete', 'insertMany'] as const) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  UserSchema.post(op as any, () => invalidateAll());
+}
 
 export const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>('User', UserSchema);

@@ -161,6 +161,11 @@ delete (mongoose.models as any).Area;
 delete (mongoose.models as any).Package;
 
 // Exports
+// Every WBS read filters by project + organisation: one compound index per level.
+for (const schema of [BuildingSchema, FloorSchema, ZoneSchema, AreaSchema, PackageSchema] as Schema<any>[]) {
+  schema.index({ projectId: 1, organizationId: 1 });
+}
+
 export const Building: Model<IBuilding> = mongoose.models.Building || mongoose.model<IBuilding>('Building', BuildingSchema);
 export const Floor: Model<IFloor> = mongoose.models.Floor || mongoose.model<IFloor>('Floor', FloorSchema);
 export const Zone: Model<IZone> = mongoose.models.Zone || mongoose.model<IZone>('Zone', ZoneSchema);

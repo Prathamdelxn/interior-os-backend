@@ -3,6 +3,7 @@
 // =============================================================================
 
 import mongoose, { Schema, Document, Model } from 'mongoose';
+import { invalidateAll } from '@/lib/ttl-cache';
 import { DEFAULT_PROJECT_PERMISSIONS } from '@/lib/project-permissions';
 
 // ── Permission Model ─────────────────────────────────────────────────────────
@@ -159,6 +160,12 @@ RoleSchema.pre('findOne', function () {
 
 // Dev hot reload would keep the previously compiled schema (e.g. an old module enum)
 if (process.env.NODE_ENV !== 'production') delete mongoose.models.Role;
+// Any change to roles clears the cached auth/permission answers (lib/ttl-cache).
+for (const op of ['save', 'updateOne', 'updateMany', 'findOneAndUpdate', 'deleteOne', 'deleteMany', 'findOneAndDelete', 'insertMany'] as const) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  RoleSchema.post(op as any, () => invalidateAll());
+}
+
 export const Role: Model<IRole> =
   mongoose.models.Role || mongoose.model<IRole>('Role', RoleSchema);
 

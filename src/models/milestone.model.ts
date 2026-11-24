@@ -82,5 +82,8 @@ MilestoneSchema.pre('findOne', function () {
 });
 
 // Exports
+MilestoneSchema.index({ projectId: 1, organizationId: 1, isDeleted: 1, dueDate: 1 });
+MilestoneDelaySchema.index({ projectId: 1, organizationId: 1, milestoneId: 1 });
+
 export const MilestoneDelay: Model<IMilestoneDelay> = mongoose.models.MilestoneDelay || mongoose.model<IMilestoneDelay>('MilestoneDelay', MilestoneDelaySchema);
 export const Milestone: Model<IMilestone> = mongoose.models.Milestone || mongoose.model<IMilestone>('Milestone', MilestoneSchema);

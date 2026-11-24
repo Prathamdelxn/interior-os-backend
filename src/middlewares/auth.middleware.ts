@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import mongoose from 'mongoose';
 import { verifyAccessToken, JwtPayload } from '@/lib/jwt';
 import { unauthorizedResponse, forbiddenResponse, notFoundResponse } from '@/lib/api-response';
+import { cached } from '@/lib/ttl-cache';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/user.model';
 import { Organization } from '@/models/organization.model';
@@ -54,15 +55,8 @@ export function withAuth(
       return unauthorizedResponse('Invalid or expired token');
     }
 
-    // Verify user still exists and is active
+    // Verify user still exists and is active (cached briefly: a page fires many calls at once)
     await connectDB();
-    const user = await User.findById(auth.userId).select('status isDeleted').lean();
-
-    if (!user || user.isDeleted || user.status !== 'active') {
-      return unauthorizedResponse('Account is inactive or not found');
-    }
-
-    // Subscription check
     const path = req.nextUrl.pathname;
     const isSuperAdmin = auth.systemRole === 'super_admin';
     const isBypassRoute =
@@ -73,8 +67,20 @@ export function withAuth(
       path.startsWith('/api/v1/plans') ||
       path.startsWith('/api/v1/billing');
 
+    // User status and org subscription are independent — look them up together
+    const [user, org] = await Promise.all([
+      cached(`auth:user:${auth.userId}`, 15_000, () => User.findById(auth.userId).select('status isDeleted').lean()),
+      isBypassRoute
+        ? Promise.resolve(null)
+        : cached(`auth:org:${auth.organizationId}`, 60_000, () => Organization.findById(auth.organizationId).select('subscription').lean()),
+    ]);
+
+    if (!user || user.isDeleted || user.status !== 'active') {
+      return unauthorizedResponse('Account is inactive or not found');
+    }
+
+    // Subscription check
     if (!isBypassRoute) {
-      const org = await Organization.findById(auth.organizationId).select('subscription').lean();
       if (org) {
         const sub = org.subscription;
         let isExpired = false;

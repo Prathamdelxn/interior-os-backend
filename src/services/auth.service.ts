@@ -2,6 +2,7 @@
 // InteriorOS Backend — Auth Service
 // =============================================================================
 
+import { computeNavAccess } from '@/lib/nav-access';
 import { connectDB } from '@/lib/db';
 import { User, Organization, Role, RefreshToken, DEFAULT_ROLES } from '@/models';
 import { generateTokenPair, generateRandomToken, getRefreshTokenExpiry } from '@/lib/jwt';
@@ -229,6 +230,13 @@ export async function login(input: LoginInput, deviceInfo?: { userAgent?: string
     }).catch(() => {});
   } catch {}
 
+  // Same sidebar-access block /auth/me returns, so the web app's first refresh sees no "change"
+  const navAccess = await computeNavAccess({
+    userId: String(user._id),
+    organizationId: String(user.organizationId),
+    systemRole: user.systemRole,
+  } as any);
+
   return {
     user: {
       id: user._id,
@@ -244,6 +252,7 @@ export async function login(input: LoginInput, deviceInfo?: { userAgent?: string
       isEmailVerified: user.isEmailVerified,
       designation: user.designation,
       department: user.department,
+      navAccess,
     },
     organization: organization
       ? {

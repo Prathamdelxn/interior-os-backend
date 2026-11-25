@@ -9,29 +9,21 @@ import { User } from '@/models/user.model';
 import { Organization } from '@/models/organization.model';
 import { successResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
-import { canAny, canOnAnyRole } from '@/lib/rbac';
-import { CRM_MODULES } from '@/lib/crm-access';
+import { computeNavAccess } from '@/lib/nav-access';
 
 async function handler(_req: NextRequest, _context: { params: Promise<Record<string, string>> }, auth: JwtPayload) {
   try {
     await connectDB();
 
-    const user = await User.findById(auth.userId).populate('role');
+    // User, organisation and sidebar access are independent — load them together
+    const [user, organization, navAccess] = await Promise.all([
+      User.findById(auth.userId).populate('role'),
+      Organization.findById(auth.organizationId),
+      computeNavAccess(auth), // same helper as login, so both return the same user shape
+    ]);
     if (!user) {
       return notFoundResponse('User not found');
     }
-
-    const organization = await Organization.findById(auth.organizationId);
-
-    // Sidebar sections this user can open (org role, or a project role for Projects)
-    const navAccess = {
-      dashboard: await canAny(auth, ['dashboard'], 'read'),
-      crm: await canAny(auth, CRM_MODULES, 'read'),
-      projects: await canOnAnyRole(auth, 'projects', 'read'),
-      vendors: await canAny(auth, ['vendors'], 'read'),
-      usersRoles: (await canAny(auth, ['roles'], 'read')) || (await canAny(auth, ['users'], 'read')),
-      audit: (await canAny(auth, ['audit_logs'], 'read')),
-    };
 
     return successResponse({
       user: {

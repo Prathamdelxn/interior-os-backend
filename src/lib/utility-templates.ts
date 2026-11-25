@@ -83,8 +83,40 @@ export function templateForLabel(label: string): UtilityTemplate | undefined {
   );
 }
 
-/** Systems the given scope text mentions, in template order. */
-export function detectSystems(scopeText: string): UtilityTemplate[] {
-  const text = ` ${String(scopeText || '').toLowerCase().replace(/\s+/g, ' ')} `;
-  return UTILITY_TEMPLATES.filter((t) => t.keywords.some((k) => text.includes(k)));
+/** Room / fixture words that appear in almost every fit-out — only trusted in priced BOQ/quote items. */
+const GENERIC = new Set(['kitchen', 'toilet', 'bathroom', 'pantry', 'wc', 'shower', 'sink', 'wash basin', 'washbasin', 'switch', 'socket', 'ac ', 'speaker', 'audio']);
+
+export interface ScopeText {
+  /** BOQ / quotation line items: the work actually priced. */
+  strong: string;
+  /** Survey notes, room requirements: free text, less reliable. */
+  weak: string;
+}
+
+// A negation word shortly before the keyword, in the same clause ("no ac work", "excluding fire alarm")
+const NEGATION = /\b(no|not|without|excluding|excluded|exclude|except|n\/a|nil|none)\b[^.\n;,]{0,25}$/;
+
+/** True if `kw` appears in `text` without a negation ("no AC work", "excluding fire") just before it. */
+function mentions(text: string, kw: string): boolean {
+  let from = 0;
+  for (;;) {
+    const i = text.indexOf(kw, from);
+    if (i < 0) return false;
+    if (!NEGATION.test(text.slice(Math.max(0, i - 40), i))) return true;
+    from = i + kw.length;
+  }
+}
+
+/**
+ * Systems the project's scope really includes, in template order.
+ * A priced BOQ/quote item is enough; free-text notes only count for specific keywords,
+ * and a negated mention ("no AC", "excluding sprinklers") never counts.
+ */
+export function detectSystems(scope: ScopeText | string): UtilityTemplate[] {
+  const norm = (t: string) => ` ${String(t || '').toLowerCase().replace(/\s+/g, ' ')} `;
+  const strong = norm(typeof scope === 'string' ? scope : scope.strong);
+  const weak = norm(typeof scope === 'string' ? '' : scope.weak);
+  return UTILITY_TEMPLATES.filter((t) =>
+    t.keywords.some((k) => mentions(strong, k) || (!GENERIC.has(k) && mentions(weak, k)))
+  );
 }

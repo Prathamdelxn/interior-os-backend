@@ -17,6 +17,7 @@ import { User } from '@/models/user.model';
 import { ProjectMember } from '@/models/project-member.model';
 import { Project } from '@/models/project.model';
 import { sendEmail } from '@/lib/email';
+import { notifyUsers } from '@/lib/notify';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 import type { JwtPayload } from '@/lib/jwt';
 
@@ -51,8 +52,22 @@ async function projectManagers(projectId: string, organizationId: string) {
   return User.find({ _id: { $in: pms.map((m: any) => m.userId) }, isDeleted: { $ne: true } }).select(PERSON).lean();
 }
 
-/** Fire-and-forget e-mail: an SMTP problem must never fail the RFI itself. */
-function notify(opts: { to: any[]; heading: string; intro: string; rfi: any; projectName: string; link: string }) {
+/** E-mail + in-app (bell) notification. Fire-and-forget: never fails the RFI itself. */
+function notify(opts: { to: any[]; heading: string; intro: string; rfi: any; projectName: string; link: string; sender?: string }) {
+  const r0 = opts.rfi;
+  notifyUsers({
+    organizationId: String(r0.organizationId),
+    userIds: opts.to.map((u) => u?._id),
+    category: 'rfi',
+    type: 'action_required',
+    title: `${r0.rfiNumber}: ${opts.heading}`,
+    body: `${opts.intro} "${r0.subject}" · ${opts.projectName}`,
+    actionUrl: `/interior-new/projects/${r0.projectId}/rfis?rfi=${r0._id}`,
+    actionLabel: 'Open RFI',
+    sender: opts.sender,
+    related: { type: 'rfi', id: String(r0._id) },
+  });
+
   const emails = [...new Set(opts.to.map((u) => u?.email).filter(Boolean))];
   if (!emails.length) return;
   const r = opts.rfi;
@@ -152,11 +167,11 @@ async function createRfiHandler(req: NextRequest, context: Ctx, auth: JwtPayload
     const projectName = (project as any)?.name || 'Project';
     if (assignee) {
       if (String(assignee._id) !== String(auth.userId)) {
-        notify({ to: [assignee], heading: 'You have a new RFI to answer', intro: `${fullName(raiser)} asked you a question.`, rfi: newRfi, projectName, link });
+        notify({ to: [assignee], heading: 'You have a new RFI to answer', intro: `${fullName(raiser)} asked you a question.`, rfi: newRfi, projectName, link, sender: String(auth.userId) });
       }
     } else {
       const pms = (await projectManagers(projectId, organizationId)).filter((u: any) => String(u._id) !== String(auth.userId));
-      notify({ to: pms, heading: 'An RFI needs an owner', intro: `${fullName(raiser)} raised a question and isn't sure who should answer it. Please assign it.`, rfi: newRfi, projectName, link });
+      notify({ to: pms, heading: 'An RFI needs an owner', intro: `${fullName(raiser)} raised a question and isn't sure who should answer it. Please assign it.`, rfi: newRfi, projectName, link, sender: String(auth.userId) });
     }
 
     await newRfi.populate(POPULATE);
@@ -213,6 +228,7 @@ async function updateRfiHandler(req: NextRequest, context: Ctx, auth: JwtPayload
           rfi,
           projectName: (project as any)?.name || 'Project',
           link: rfiLink(req, projectId, String(rfi._id)),
+          sender: String(auth.userId),
         });
       }
       await rfi.populate(POPULATE);

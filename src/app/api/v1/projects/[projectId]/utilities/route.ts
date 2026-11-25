@@ -17,7 +17,7 @@ import { UtilitySystem, type IUtilitySystem } from '@/models/utility.model';
 import { CrmCustomer } from '@/models/crm-customer.model';
 import { BOQItem } from '@/models/boq.model';
 import { successResponse, createdResponse, serverErrorResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
-import { detectSystems, slugify, templateForLabel } from '@/lib/utility-templates';
+import { detectSystems, slugify, templateForLabel, type ScopeText } from '@/lib/utility-templates';
 import type { JwtPayload } from '@/lib/jwt';
 
 type Ctx = { params: Promise<Record<string, string>> };
@@ -27,31 +27,38 @@ const pct = (sys: IUtilitySystem) => {
   return total ? Math.round((sys.checkpoints.filter((c) => c.status === 'passed').length / total) * 100) : 0;
 };
 
-/** Everything the project says about its scope, as one lower-case blob. */
-async function collectScopeText(projectId: string, organizationId: string): Promise<string> {
-  const parts: string[] = [];
-  const push = (...v: unknown[]) => v.forEach((x) => typeof x === 'string' && x.trim() && parts.push(x));
+/**
+ * What the project says about its scope, split by how much to trust it:
+ *  strong = BOQ / quotation line items (the work actually priced)
+ *  weak   = survey notes and room requirements (free text, room names)
+ */
+async function collectScope(projectId: string, organizationId: string): Promise<ScopeText> {
+  const strong: string[] = [];
+  const weak: string[] = [];
+  const add = (to: string[]) => (...v: unknown[]) => v.forEach((x) => typeof x === 'string' && x.trim() && to.push(x));
+  const S = add(strong);
+  const W = add(weak);
 
   const lead: any = await CrmCustomer.findOne({ linkedProject: projectId, organizationId }).lean();
   if (lead) {
     const sm = lead.siteMeasurements || {};
-    push(sm.electricalPoints, sm.plumbingPoints, sm.acLocations, sm.siteConstraints, sm.notes);
+    W(sm.electricalPoints, sm.plumbingPoints, sm.acLocations, sm.siteConstraints, sm.notes);
     (lead.requirements || []).forEach((r: any) =>
-      push(r.roomName, r.electricalPoints, r.lightingRequirements, r.plumbingRequirements, r.description)
+      W(r.roomName, r.electricalPoints, r.lightingRequirements, r.plumbingRequirements, r.description)
     );
     (lead.boqs || []).forEach((b: any) => {
-      (b.sections || []).forEach((s: any) => push(s.sectionTitle, s.scopeDescription));
-      (b.items || []).forEach((it: any) => push(it.category, it.sectionTitle, it.itemName, it.description));
+      (b.sections || []).forEach((s: any) => { S(s.sectionTitle); W(s.scopeDescription); });
+      (b.items || []).forEach((it: any) => S(it.category, it.sectionTitle, it.itemName, it.description));
     });
     const accepted = (lead.quotations || []).filter((q: any) => ['Accepted', 'Approved'].includes(q.status));
     (accepted.length ? accepted : lead.quotations || []).forEach((q: any) =>
-      (q.items || []).forEach((it: any) => push(it.category, it.description))
+      (q.items || []).forEach((it: any) => S(it.category, it.description))
     );
   }
 
   const boqItems: any[] = await BOQItem.find({ projectId, organizationId }).select('category description itemName').limit(2000).lean();
-  boqItems.forEach((it) => push(it.category, it.description, it.itemName));
-  return parts.join(' \n ');
+  boqItems.forEach((it) => S(it.category, it.description, it.itemName));
+  return { strong: strong.join(' \n '), weak: weak.join(' \n ') };
 }
 
 // GET: list systems; detect them from scope the first time the project opens this tab
@@ -64,7 +71,7 @@ async function getUtilitiesHandler(_req: NextRequest, context: Ctx, auth: JwtPay
     // Seed only once per project (soft-deleted rows count, so removing everything stays removed).
     const everCreated = await UtilitySystem.countDocuments({ projectId, organizationId, isDeleted: { $in: [true, false] } });
     if (everCreated === 0) {
-      const detected = detectSystems(await collectScopeText(projectId, organizationId));
+      const detected = detectSystems(await collectScope(projectId, organizationId));
       await Promise.all(
         detected.map((t, i) =>
           UtilitySystem.create({
@@ -100,7 +107,7 @@ async function createUtilityHandler(req: NextRequest, context: Ctx, auth: JwtPay
     const count = await UtilitySystem.countDocuments({ projectId, organizationId });
 
     if (body.action === 'detect') {
-      const detected = detectSystems(await collectScopeText(projectId, organizationId));
+      const detected = detectSystems(await collectScope(projectId, organizationId));
       const existing = await UtilitySystem.find({ projectId, organizationId, isDeleted: { $in: [true, false] } }).select('system');
       const have = new Set(existing.map((s) => s.system));
       const fresh = detected.filter((t) => !have.has(t.key));

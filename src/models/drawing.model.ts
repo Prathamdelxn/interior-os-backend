@@ -36,6 +36,11 @@ export interface IDrawingRevision {
   uploadedBy: mongoose.Types.ObjectId;
   changes?: string;
   createdAt: Date;
+  /** This revision's own review outcome (the drawing-level status only describes the latest one). */
+  status?: 'submitted' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  decidedBy?: mongoose.Types.ObjectId;
+  decidedAt?: Date;
 }
 
 export interface IDrawing extends Document {
@@ -100,6 +105,10 @@ const DrawingSchema = new Schema<IDrawing>(
         uploadedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
         changes: String,
         createdAt: { type: Date, default: Date.now },
+        status: { type: String, enum: ['submitted', 'approved', 'rejected'] },
+        rejectionReason: String,
+        decidedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+        decidedAt: Date,
       },
     ],
     annotations: [

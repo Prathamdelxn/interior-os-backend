@@ -64,6 +64,7 @@ async function createDrawingHandler(req: NextRequest, context: { params: Promise
           uploadedBy: new mongoose.Types.ObjectId(auth.userId),
           changes: 'Initial release',
           createdAt: new Date(),
+          status: 'submitted',
         },
       ],
     });
@@ -159,6 +160,19 @@ async function updateDrawingHandler(req: NextRequest, context: { params: Promise
       updatePayload.submittedAt = new Date();
     }
 
+    // The decision belongs to the LATEST revision only — earlier revisions keep their own outcome
+    // (approving v2 must never mark a rejected v1 as approved).
+    const latestRevIdx = (drawing.revisions?.length || 0) - 1;
+    const isNewUpload = Boolean(effectiveFileUrl && effectiveRevName);
+    if ((status === 'approved' || status === 'rejected') && !isNewUpload && latestRevIdx >= 0) {
+      updatePayload[`revisions.${latestRevIdx}.status`] = status;
+      updatePayload[`revisions.${latestRevIdx}.decidedBy`] = userId;
+      updatePayload[`revisions.${latestRevIdx}.decidedAt`] = new Date();
+      if (status === 'rejected' && rejectionReason) {
+        updatePayload[`revisions.${latestRevIdx}.rejectionReason`] = String(rejectionReason).trim();
+      }
+    }
+
     // Decision: stamp approver / rejecter server-side
     if (status === 'approved') {
       updatePayload.approvedBy = userId;
@@ -180,6 +194,7 @@ async function updateDrawingHandler(req: NextRequest, context: { params: Promise
         uploadedBy: new mongoose.Types.ObjectId(auth.userId),
         changes: changes || '',
         createdAt: new Date(),
+        status: 'submitted' as const, // its own review starts now; earlier revisions keep their outcome
       };
       updatePayload.$push = { revisions: newRev };
       updatePayload.status = 'submitted';
